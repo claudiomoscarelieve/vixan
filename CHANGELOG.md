@@ -15,6 +15,7 @@ La versión instalada se ve en **Panel Vixan → Servidor**.
 - Los combos y cajas de la versión anterior se pasan solos al catálogo.
 - El código pasa a un repositorio de GitHub con control de versiones; las guías de ayuda viven en `docs/`.
 - El servidor se actualiza con `git pull` (sin zip) y el Panel Vixan muestra la versión instalada.
+- `deploy/volver.sh` vuelve el servidor a una versión anterior.
 - `deploy/clave-superadmin.sh` pone una contraseña nueva al superadmin si se pierde.
 
 ## 1.3.1 — 19/11/2026

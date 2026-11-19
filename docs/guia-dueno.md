@@ -40,7 +40,7 @@ cd /root/vixan && git pull && bash deploy/actualizar.sh
 
 Hace una copia de la base, reemplaza solo el código y reinicia. Al final dice **"Vixan 1.x.x actualizado y funcionando"**. Tus datos no se tocan.
 
-Para volver a una versión anterior si algo sale mal: `cd /root/vixan && git checkout v1.4.0 && bash deploy/actualizar.sh` (cambiando el número por la versión que quieras). Para volver a la última: `git checkout main && git pull`.
+Si una versión nueva sale mal, volvé a la anterior con `bash /root/vixan/deploy/volver.sh 1.4.0` (cambiando el número; sin número te muestra las que hay). Para volver a la última: `bash /root/vixan/deploy/volver.sh ultima`.
 
 ### Conectar el servidor con GitHub (una sola vez)
 
