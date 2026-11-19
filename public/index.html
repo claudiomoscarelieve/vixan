@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vixan — Plataforma de logística y e-commerce</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/brand/favicon-64.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<meta name="theme-color" content="#0F253C">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="login" class="login hidden">
+  <form class="login-card" id="login-form" autocomplete="on">
+    <img class="login-logo" src="/brand/vixan-logo.png" alt="Vixan">
+    <p class="muted">Gestión integral para tu e-commerce</p>
+    <label>Usuario<input name="email" type="email" placeholder="tu mail" required autocomplete="username"></label>
+    <label>Contraseña<input name="password" type="password" required autocomplete="current-password"></label>
+    <div id="login-err" class="err"></div>
+    <button class="btn primary block" type="submit">Ingresar</button>
+    <p class="muted small">¿Sin clave? Pedísela al administrador de tu cuenta.</p>
+  </form>
+</div>
+
+<div id="app" class="app hidden">
+  <aside class="side" id="side">
+    <div class="side-head">
+      <img class="side-logo" src="/brand/vixan-logo-blanco.png" alt="Vixan">
+      <div class="tenant" id="tenant-name"></div>
+    </div>
+    <input class="side-search" id="side-search" placeholder="Buscar sección…">
+    <nav id="nav"></nav>
+    <div class="side-foot"><button class="btn ghost small block" id="cambiar-clave">Cambiar contraseña</button><button class="btn ghost small block" id="logout">Cerrar sesión</button></div>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <button class="icon-btn" id="toggle-side" title="Menú">☰</button>
+      <div class="crumbs" id="crumbs"></div>
+      <div class="top-right">
+        <select id="tenant-switch" class="hidden" title="Cliente activo"></select>
+        <span class="user" id="user-name"></span>
+      </div>
+    </header>
+    <section id="view" class="view"></section>
+  </main>
+</div>
+<div id="toasts" class="toasts"></div>
+<script src="/core.js"></script>
+<script src="/catalogo.js"></script>
+<script src="/modules.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
