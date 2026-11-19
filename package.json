@@ -1,11 +1,12 @@
 {
   "name": "vixan",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Vixan — plataforma multicliente de logística y gestión para e-commerce",
   "main": "server/index.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server/index.js",
-    "dev": "node --watch --env-file-if-exists=.env server/index.js"
+    "dev": "node --watch --env-file-if-exists=.env server/index.js",
+    "test": "node --test test/*.test.js"
   },
   "license": "UNLICENSED",
   "dependencies": {

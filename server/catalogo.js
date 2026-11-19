@@ -1,7 +1,13 @@
 // Vixan — catálogo y precios: costos (pesos o dólares), costos internos, listas de precios,
 // combos, cajas y fraccionados (presentaciones que se venden por partes de un producto entero).
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const store = require('./db');
+
+// Fotos de productos y logos de tiendas: al lado de la base, en data/media/<cliente>/
+const MEDIA_DIR = process.env.VIXAN_MEDIA || path.join(path.dirname(process.env.VIXAN_DB || path.join(__dirname, '..', 'data', 'vixan.db')), 'media');
 
 const num = (v) => (v === '' || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
 const n0 = (v) => num(v) || 0;
@@ -467,4 +473,66 @@ router.post('/categorias/asignar', wrap((req) => {
   return { actualizados: n };
 }));
 
-module.exports = { router, contexto, expandir, disponible, stockFisico, precioEnLista, precioGeneral, costoFinal, redondear, recargoHabitual, migrarTodos, normalizarLista, actualizarDolar, tipoDe };
+// ───────────── Fotos (tienda online) ─────────────
+const MAX_FOTO = 3 * 1024 * 1024;
+const MAX_FOTOS = 8;
+// Se reconoce el formato por los primeros bytes, no por lo que diga el navegador
+function tipoImagen(buf) {
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
+  if (buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png';
+  if (buf.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP') return 'webp';
+  return null;
+}
+function guardarImagen(t, dataUrl, prefijo) {
+  const m = /^data:[^;,]*;base64,(.+)$/s.exec(String(dataUrl || ''));
+  if (!m) throw new Error('Elegí una imagen');
+  const buf = Buffer.from(m[1], 'base64');
+  if (buf.length > MAX_FOTO) throw new Error('La imagen pesa más de 3 MB: achicala y probá de nuevo');
+  const ext = tipoImagen(buf);
+  if (!ext) throw new Error('Solo se aceptan fotos JPG, PNG o WebP');
+  const dir = path.join(MEDIA_DIR, String(Number(t)));
+  fs.mkdirSync(dir, { recursive: true });
+  const nombre = `${String(prefijo || 'foto').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'foto'}-${crypto.randomBytes(5).toString('hex')}.${ext}`;
+  fs.writeFileSync(path.join(dir, nombre), buf);
+  return `/media/${Number(t)}/${nombre}`;
+}
+function borrarImagen(t, url) {
+  const m = /^\/media\/(\d+)\/([a-z0-9-]+\.(?:jpg|png|webp))$/.exec(String(url || ''));
+  if (!m || Number(m[1]) !== Number(t)) return; // solo archivos propios de este cliente
+  try { fs.unlinkSync(path.join(MEDIA_DIR, m[1], m[2])); } catch { /* ya no estaba */ }
+}
+router.post('/productos/:id/imagenes', wrap((req) => {
+  const t = req.tenantId;
+  const p = store.get(t, 'productos', req.params.id);
+  if (!p) throw new Error('No existe el producto');
+  const actuales = p.imagenes || [];
+  if (actuales.length >= MAX_FOTOS) throw new Error(`Cada producto puede tener hasta ${MAX_FOTOS} fotos`);
+  const url = guardarImagen(t, req.body?.data, p.sku);
+  const r = store.update(t, 'productos', p.id, { imagenes: [...actuales, url] });
+  avisarStock(t);
+  return r.imagenes;
+}));
+// Quitar una foto o cambiar el orden (la primera es la principal): body {imagenes:[...]} con las que quedan
+router.put('/productos/:id/imagenes', wrap((req) => {
+  const t = req.tenantId;
+  const p = store.get(t, 'productos', req.params.id);
+  if (!p) throw new Error('No existe el producto');
+  const actuales = p.imagenes || [];
+  const nuevas = (req.body?.imagenes || []).map(String).filter((u, i, a) => actuales.includes(u) && a.indexOf(u) === i);
+  for (const u of actuales) if (!nuevas.includes(u)) borrarImagen(t, u);
+  const r = store.update(t, 'productos', p.id, { imagenes: nuevas });
+  avisarStock(t);
+  return r.imagenes;
+}));
+// Logo de la tienda online
+router.post('/tienda/logo', wrap((req) => {
+  const t = req.tenantId;
+  const cfg = store.getSettings(t).tienda || {};
+  const url = req.body?.quitar ? null : guardarImagen(t, req.body?.data, 'logo');
+  if (cfg.logo) borrarImagen(t, cfg.logo);
+  store.setSetting(t, 'tienda', { ...cfg, logo: url });
+  avisarStock(t);
+  return { logo: url };
+}));
+
+module.exports = { MEDIA_DIR, router, contexto, expandir, disponible, stockFisico, precioEnLista, precioGeneral, costoFinal, redondear, recargoHabitual, migrarTodos, normalizarLista, actualizarDolar, tipoDe };

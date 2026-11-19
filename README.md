@@ -49,7 +49,7 @@ cd /root/vixan && git pull && bash deploy/actualizar.sh
 ### Lo que queda simulado o pendiente
 - **WhatsApp y mails masivos**: la bandeja y las campañas se guardan, pero no salen mensajes reales. Para enviarlos hay que conectar WhatsApp Cloud API (Meta) y un proveedor SMTP o de envío (por ejemplo Amazon SES o Brevo).
 - **OCA y Andreani**: el cotizador usa tarifas configurables. Para cotizar y generar etiquetas reales hacen falta las credenciales de sus APIs.
-- **Venta entre sellers y Vixan Market**: la gestión interna está, pero falta la vidriera pública.
+- **Venta entre sellers y Vixan Market**: la gestión interna y la API para la tienda online están (`/api/tienda/v1`, ver CHANGELOG 1.5.0); la vidriera pública es la app `vixan-tienda`.
 
 ## Instalación
 

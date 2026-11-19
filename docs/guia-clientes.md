@@ -93,6 +93,16 @@ Porcentajes: 45 se escribe 45, no 0,45. Al lado de cada precio ves a qué markup
 
 **Fraccionados.** Para lo que comprás entero y vendés también por partes (una bolsa de 500 g que se vende en 250, 100 y 25 g). **+ Nuevo fraccionado**: elegís el producto entero, cuánto trae y la porción más chica; **Sugerir las habituales** arma las presentaciones (mitad, quinto, décimo…). Cada presentación es un producto con su SKU que podés publicar en la tienda. Su precio es la parte proporcional del entero más un **recargo** (vacío = el habitual: mitad +10 %, quinto +15 %, décimo +30 %, veinteavo +50 %). Al venderla se descuenta su parte del producto entero, así que el stock del entero puede quedar con decimales (por ejemplo 19,5 bolsas). Si una presentación ya existía como producto suelto con stock, ese stock pasa al entero.
 
+## Preparar tu tienda online (Vixan Market)
+
+La tienda online toma todo de Vixan: productos, precios, stock y promociones. Mientras se termina la tienda pública podés dejarla lista:
+
+1. **Ventas → Vixan Market → Mi tienda**: nombre, link (por ejemplo `mitienda`, que queda `mitienda.vixan.com.ar`), lista de precios, color, logo, medios de pago y datos de contacto. Si tenés un dominio propio, escribilo y pedile al soporte de Vixan que lo apunte.
+2. **Catálogo y precios**: en cada producto que quieras vender, marcá **Publicar en Vixan Market** y escribí la **descripción** (en Editar). En **Detalles → Fotos del producto** subí hasta 8 fotos JPG, PNG o WebP de hasta 3 MB; la primera es la principal.
+3. **Promociones**: las vigentes se aplican solas al precio de la tienda (porcentaje, monto fijo o 2x1).
+
+Solo se muestran los productos publicados que tienen precio en la lista elegida. Los pedidos de la tienda entran en **Pedidos** como "Vixan Market", reservan stock y se facturan como cualquier otro.
+
 ## Facturar con ARCA
 
 Vixan emite facturas A, B o C con CAE a nombre de tu CUIT. La conexión se configura una sola vez, en **Configuración → Facturación electrónica (ARCA)**, y conviene empezar en **modo prueba**, donde las facturas no tienen validez fiscal.

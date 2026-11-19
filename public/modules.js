@@ -503,13 +503,42 @@ async function renderApi(el) {
 }
 
 // ═════════════ Tienda online ═════════════
-const tiendaConfig = settingsForm('tienda', [
-  { k: 'abierta', label: 'Tienda abierta al público', type: 'checkbox', full: true }, { k: 'nombre', label: 'Nombre de la tienda' }, { k: 'slug', label: 'Link (tutienda)', placeholder: 'insumos-demo' },
-  { k: 'lista', label: 'Lista de precios', type: 'select', options: ['Minorista', 'Mayorista', 'Gastronomía'] }, { k: 'dominio', label: 'Dominio propio', placeholder: 'tienda.midominio.com.ar' },
-  { k: 'color', label: 'Color principal', type: 'color', default: '#1FB1A4' }, { k: 'envio', label: 'Costo de envío fijo ($)', type: 'number' },
-  { k: 'pago_mp', label: 'Acepta Mercado Pago', type: 'checkbox' }, { k: 'pago_transf', label: 'Acepta transferencia (−5%)', type: 'checkbox' },
-  { k: 'ocultos', label: 'SKUs ocultos', type: 'textarea', full: true, placeholder: 'VG-1001, VG-1002' },
-], 'Tu vidriera pública de venta directa: nombre y link propio, lista de precios y productos visibles. Los pedidos entran solos al sistema como venta "Vixan Market".');
+// Mi tienda (Vixan Market): la lista de precios sale de las listas reales del catálogo
+async function tiendaConfig(el) {
+  const listas = await VG.get('/api/r/listas_precio').catch(() => []);
+  const s = (await getSettings()).tienda || {};
+  const opcionesLista = [['general', 'Precio general (el de la ficha)'], ...listas.filter((l) => !l.archivada).map((l) => [String(l.id), l.nombre])];
+  // listas guardadas por nombre en la versión anterior
+  const actual = listas.find((l) => String(l.id) === String(s.lista) || l.nombre === s.lista);
+  const fields = [
+    { k: 'abierta', label: 'Tienda abierta al público', type: 'checkbox', full: true }, { k: 'nombre', label: 'Nombre de la tienda' }, { k: 'slug', label: 'Link (tutienda.vixan.com.ar)', placeholder: 'mitienda' },
+    { k: 'lista', label: 'Lista de precios', type: 'select', options: opcionesLista }, { k: 'dominio', label: 'Dominio propio (opcional)', placeholder: 'tienda.midominio.com.ar' },
+    { k: 'color', label: 'Color principal', type: 'color', default: '#1FB1A4' }, { k: 'envio', label: 'Costo de envío fijo ($, vacío = cotizador)', type: 'number' },
+    { k: 'pago_mp', label: 'Acepta Mercado Pago', type: 'checkbox' }, { k: 'pago_transf', label: 'Acepta transferencia (−5%)', type: 'checkbox' },
+    { k: 'datos_transferencia', label: 'Datos para la transferencia (CBU, alias, titular)', type: 'textarea', full: true },
+    { k: 'email', label: 'Email de contacto', type: 'email' }, { k: 'whatsapp', label: 'WhatsApp de contacto', placeholder: '11 5555-5555' },
+    { k: 'ocultos', label: 'SKUs ocultos', type: 'textarea', full: true, placeholder: 'VG-1001, VG-1002' },
+  ];
+  const link = s.slug ? `https://${esc(s.slug)}.vixan.com.ar` : '';
+  el.innerHTML = `<div class="note">Tu vidriera pública de venta directa. Se ven los productos marcados <b>Publicar en Vixan Market</b> que tienen precio en la lista elegida, con sus fotos, descripción y promociones. Los pedidos entran solos como venta "Vixan Market" y reservan stock.${link ? `<br>Dirección de tu tienda: <a href="${link}" target="_blank" rel="noopener">${link}</a>${s.dominio ? ` y <b>${esc(s.dominio)}</b> (el dominio tiene que apuntar al servidor de Vixan)` : ''}` : ''}</div>`;
+  const f = VG.form(fields, { ...s, lista: actual ? String(actual.id) : 'general' });
+  const c = VG.h('<div class="card"></div>'); c.appendChild(f);
+  const logo = VG.h(`<div style="display:flex;align-items:center;gap:12px;margin-top:14px"><span class="muted small">Logo</span><span data-l></span><label class="btn" style="cursor:pointer">Subir logo<input type="file" accept="image/jpeg,image/png,image/webp" hidden></label><button class="btn danger" data-q>Quitar</button></div>`);
+  const pintarLogo = (u) => { logo.querySelector('[data-l]').innerHTML = u ? `<img src="${esc(u)}" alt="" style="height:44px;max-width:180px;object-fit:contain">` : '<span class="muted small">sin logo</span>'; logo.querySelector('[data-q]').style.display = u ? '' : 'none'; };
+  pintarLogo(s.logo);
+  logo.querySelector('input').onchange = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    try { const data = await new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = mal; r.readAsDataURL(file); }); const r = await VG.post('/api/catalogo/tienda/logo', { data }); settingsCache.v = null; pintarLogo(r.logo); VG.toast('Logo guardado'); } catch (err) { VG.toast(err.message, true); }
+    e.target.value = '';
+  };
+  logo.querySelector('[data-q]').onclick = async () => { await VG.post('/api/catalogo/tienda/logo', { quitar: true }); settingsCache.v = null; pintarLogo(null); };
+  c.appendChild(logo);
+  const b = VG.h('<div class="toolbar" style="margin-top:12px"><button class="btn primary">Guardar</button></div>');
+  b.querySelector('button').onclick = async () => {
+    try { const v = VG.readForm(f, fields); const prev = (await getSettings()).tienda || {}; await VG.put('/api/settings', { tienda: { ...prev, ...v } }); settingsCache.v = null; VG.toast('Configuración guardada'); tiendaConfig(el); } catch (e) { VG.toast(e.message, true); }
+  };
+  c.appendChild(b); el.appendChild(c);
+}
 
 // ═════════════ WhatsApp ═════════════
 async function renderWhatsapp(el) {

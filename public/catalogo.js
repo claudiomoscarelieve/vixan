@@ -44,10 +44,16 @@ function detalle(p, ctx) {
       <div class="card"><h3>Stock y costos</h3>${lineas([['Stock disponible', VG.n(p.stock)], ['Stock mínimo', p.stock_minimo ? VG.n(p.stock_minimo) : '—'], ['Costo en dólares', p.costo_usd ? 'US$ ' + VG.n(p.costo_usd) : '—'], ['Costo proveedor', money(p.costo_base)], ['Costos internos', p.tipo === 'unidad' ? pct(p.costos_internos ?? C.data.config.costos_internos_general) : '—'], ['Costo final', money(p.costo_final)], ['Margen', p.margen == null ? '—' : pct(p.margen)]])}</div>
       <div class="card"><h3>Precios de venta</h3>${lineas(precios)}</div>
     </div>
+    <div class="card" style="margin-top:12px"><h3>Tienda online</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px">${(p.imagenes || []).map((u) => `<img src="${esc(u)}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">`).join('') || '<span class="muted small">Sin fotos todavía.</span>'}</div>
+      <div class="small ${p.descripcion ? '' : 'muted'}" style="white-space:pre-wrap">${p.descripcion ? esc(p.descripcion) : 'Sin descripción. Se carga en Editar.'}</div>
+      <div style="margin-top:10px"><button class="btn" data-fotos>Fotos del producto</button></div>
+    </div>
     ${p.detalle_componentes ? `<div class="card" style="margin-top:12px"><h3>Componentes</h3>${tablaComponentes(p)}</div>` : ''}
     ${p.tipo === 'presentacion' ? `<div class="note" style="margin-top:12px">Es una presentación de <b>${esc(p.fraccion_de)}</b>: ${p.partes} partes por venta. Su stock sale del producto entero.</div>` : ''}
   </div>`);
   const m = VG.modal({ title: p.nombre, body, wide: true, footer: false });
+  body.querySelector('[data-fotos]').onclick = () => { m.close(); editorFotos(p, ctx); };
   const pie = VG.h('<div class="modal-f"></div>');
   const btn = (label, fn, tone = '') => { const b = VG.h(`<button class="btn ${tone}">${esc(label)}</button>`); b.onclick = fn; pie.appendChild(b); };
   btn('Eliminar', async () => { if (!VG.confirm(`¿Eliminar ${p.sku} del catálogo?`)) return; await VG.del(`/api/r/productos/${p.id}`); m.close(); VG.toast('Producto eliminado'); ctx?.reload(); }, 'danger');
@@ -55,6 +61,39 @@ function detalle(p, ctx) {
   btn('Editar', () => { m.close(); ctx?.openForm(p); });
   btn('Cerrar', () => m.close(), 'primary');
   m.el.querySelector('.modal').appendChild(pie);
+}
+// Fotos de un producto para la tienda online: subir, ordenar (la primera es la principal) y quitar
+const leerArchivo = (f) => new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => mal(new Error('No se pudo leer el archivo')); r.readAsDataURL(f); });
+function editorFotos(p, ctx) {
+  let fotos = [...(p.imagenes || [])];
+  const body = VG.h(`<div>
+    <p class="muted small" style="margin-top:0">Fotos JPG, PNG o WebP de hasta 3 MB, hasta 8 por producto. La primera es la que se ve en el listado de la tienda.</p>
+    <div data-g style="display:flex;gap:10px;flex-wrap:wrap"></div>
+    <div class="toolbar" style="margin-top:12px"><label class="btn primary" style="cursor:pointer">+ Agregar fotos<input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden data-f></label><span class="muted small" data-st></span></div>
+  </div>`);
+  const g = body.querySelector('[data-g]');
+  const guardarOrden = async (nuevas) => { fotos = await VG.put(`/api/catalogo/productos/${p.id}/imagenes`, { imagenes: nuevas }); pintar(); };
+  const pintar = () => {
+    g.innerHTML = fotos.length ? '' : '<span class="muted">Este producto todavía no tiene fotos.</span>';
+    fotos.forEach((u, i) => {
+      const c = VG.h(`<div style="width:132px;text-align:center"><img src="${esc(u)}" alt="" style="width:132px;height:132px;object-fit:cover;border-radius:10px;border:${i === 0 ? '2px solid var(--teal)' : '1px solid var(--border)'}"><div class="small" style="display:flex;justify-content:center;gap:4px;margin-top:4px">${i === 0 ? '<span class="badge teal">Principal</span>' : '<button class="btn" data-p title="Usar como principal">★</button>'}<button class="btn danger" data-q title="Quitar">✕</button></div></div>`);
+      c.querySelector('[data-p]')?.addEventListener('click', () => guardarOrden([u, ...fotos.filter((x) => x !== u)]).catch((e) => VG.toast(e.message, true)));
+      c.querySelector('[data-q]').onclick = () => { if (VG.confirm('¿Quitar esta foto?')) guardarOrden(fotos.filter((x) => x !== u)).catch((e) => VG.toast(e.message, true)); };
+      g.appendChild(c);
+    });
+  };
+  body.querySelector('[data-f]').onchange = async (e) => {
+    const st = body.querySelector('[data-st]');
+    for (const f of [...e.target.files]) {
+      st.textContent = `Subiendo ${f.name}…`;
+      try { fotos = await VG.post(`/api/catalogo/productos/${p.id}/imagenes`, { data: await leerArchivo(f) }); pintar(); } catch (err) { VG.toast(`${f.name}: ${err.message}`, true); }
+    }
+    st.textContent = ''; e.target.value = '';
+  };
+  pintar();
+  const m = VG.modal({ title: `Fotos de ${p.nombre}`, body, wide: true, footer: true });
+  // al cerrar, la tabla se recarga para que el detalle muestre las fotos nuevas
+  m.el.querySelectorAll('[data-x]').forEach((x) => x.addEventListener('click', () => ctx?.reload?.()));
 }
 const tablaComponentes = (p) => `<table class="t"><thead><tr><th>SKU</th><th>Producto</th><th class="num">Cantidad</th><th class="num">Costo unitario</th><th class="num">Subtotal</th><th class="num">Disponible</th></tr></thead><tbody>${p.detalle_componentes.map((c) => `<tr><td><code class="k">${esc(c.sku)}</code></td><td>${c.existe ? esc(c.nombre) : badge('No está en el catálogo', 'err')}</td><td class="num">${VG.n(c.cantidad)}</td><td class="num">${money(c.costo_unitario)}</td><td class="num">${money(c.subtotal)}</td><td class="num">${VG.n(c.disponible)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="4"><b>Suma de los componentes</b></td><td class="num"><b>${money(p.suma_componentes)}</b></td><td></td></tr></tfoot></table>`;
 
@@ -71,6 +110,7 @@ const formProducto = (row) => [
   { k: 'ancho', label: 'Ancho (cm)', type: 'number', step: '0.1' }, { k: 'alto', label: 'Alto (cm)', type: 'number', step: '0.1' },
   { k: 'litros', label: 'Litros por unidad', type: 'number', step: '0.01' },
   { k: 'market', label: 'Publicar en Vixan Market', type: 'checkbox' },
+  { k: 'descripcion', label: 'Descripción para la tienda online', type: 'textarea', full: true, placeholder: 'Lo que ve el comprador en la ficha del producto' },
 ];
 function tabCatalogo(el) {
   VG.crud(el, {

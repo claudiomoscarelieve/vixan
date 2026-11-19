@@ -183,6 +183,7 @@ async function enviarStock(t, { forzar = false } = {}) {
 // Después de cualquier cambio de stock, espera unos segundos y manda lo que cambió
 const pendientes = new Map();
 function programarEnvioStock(t) {
+  require('./tienda-avisos').avisarCambio(t); // la tienda online también se entera
   if (!cfgDe(t).enviar_stock) return;
   clearTimeout(pendientes.get(t));
   pendientes.set(t, setTimeout(() => { pendientes.delete(t); enviarStock(t).catch((e) => guardar(t, { ultimo_error_stock: e.message })); }, Number(process.env.WOO_STOCK_DEBOUNCE_MS) || 8000));

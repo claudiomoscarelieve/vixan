@@ -9,7 +9,11 @@ const woo = require('./woo');
 const catalogo = require('./catalogo');
 const arca = require('./arca');
 const { facturaHTML } = require('./factura-html');
+const tiendaApi = require('./tienda-api');
+const avisos = require('./tienda-avisos');
 const STOCK_ENTITIES = new Set(['lotes', 'pedidos', 'productos']);
+// Lo que además se ve en la tienda online (Vixan Market)
+const TIENDA_ENTITIES = new Set(['tienda_promos', 'listas_precio', 'categorias']);
 // Avisa al sincronizador de WooCommerce cuando algo pudo cambiar el stock
 const tocaStock = (req) => woo.programarEnvioStock(req.tenantId);
 
@@ -91,6 +95,8 @@ app.post('/api/auth/logout', (req, res) => {
 
 // ───────────── Webhooks públicos (antes del auth) ─────────────
 app.use('/api/hooks', integrar.publicRouter);
+// API de la tienda online: entra con su propia clave, no con sesión ni API key de cliente
+app.use('/api/tienda/v1', tiendaApi.router);
 
 app.use('/api', auth);
 
@@ -159,6 +165,7 @@ app.post('/api/r/:entity', checkEntity, wrap((req) => {
   const r = store.create(req.tenantId, req.params.entity, req.body || {});
   store.logEvent(req.tenantId, req.user.id, `${req.params.entity}.crear`, { id: r.id });
   if (STOCK_ENTITIES.has(req.params.entity)) tocaStock(req);
+  if (TIENDA_ENTITIES.has(req.params.entity)) avisos.avisarCambio(req.tenantId);
   return r;
 }));
 app.put('/api/r/:entity/:id', checkEntity, bloquearFiscal, wrap((req, res) => {
@@ -166,11 +173,13 @@ app.put('/api/r/:entity/:id', checkEntity, bloquearFiscal, wrap((req, res) => {
   if (!r) return res.status(404).json({ ok: false, error: 'No existe' });
   store.logEvent(req.tenantId, req.user.id, `${req.params.entity}.editar`, { id: r.id });
   if (STOCK_ENTITIES.has(req.params.entity)) tocaStock(req);
+  if (TIENDA_ENTITIES.has(req.params.entity)) avisos.avisarCambio(req.tenantId);
   return r;
 }));
 app.delete('/api/r/:entity/:id', checkEntity, bloquearFiscal, wrap((req) => {
   store.logEvent(req.tenantId, req.user.id, `${req.params.entity}.borrar`, { id: req.params.id });
   if (STOCK_ENTITIES.has(req.params.entity)) tocaStock(req);
+  if (TIENDA_ENTITIES.has(req.params.entity)) avisos.avisarCambio(req.tenantId);
   return store.remove(req.tenantId, req.params.entity, req.params.id);
 }));
 app.post('/api/r/:entity/bulk-delete', checkEntity, wrap((req) => { const n = (req.body.ids || []).filter((id) => !(req.params.entity === 'facturas' && store.get(req.tenantId, 'facturas', id)?.cae) && store.remove(req.tenantId, req.params.entity, id)).length; if (STOCK_ENTITIES.has(req.params.entity)) tocaStock(req); return n; }));
@@ -262,9 +271,24 @@ function settingsPublicas(t) {
   for (const k of Object.keys(s)) if (PRIVADAS.test(k)) delete s[k];
   return s;
 }
+// La configuración de la tienda online: el link y el dominio propio no se pueden repetir entre clientes
+function limpiarTienda(t, v) {
+  const c = { ...(v || {}) };
+  c.slug = String(c.slug || '').trim().toLowerCase();
+  c.dominio = String(c.dominio || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (c.slug && !/^[a-z0-9](?:[a-z0-9-]{0,40}[a-z0-9])?$/.test(c.slug)) throw new Error('El link de la tienda solo puede tener letras minúsculas, números y guiones');
+  if (['app', 'www', 'api', 'admin', 'mail', 'tienda', 'market'].includes(c.slug)) throw new Error(`"${c.slug}" está reservado: elegí otro link`);
+  for (const o of store.db.prepare("SELECT tenant_id, value FROM settings WHERE key='tienda' AND tenant_id<>?").all(t)) {
+    let x = {}; try { x = JSON.parse(o.value) || {}; } catch {}
+    if (c.slug && String(x.slug || '').toLowerCase() === c.slug) throw new Error('Ese link ya lo usa otra tienda');
+    if (c.dominio && String(x.dominio || '').toLowerCase() === c.dominio) throw new Error('Ese dominio ya lo usa otra tienda');
+  }
+  return c;
+}
 app.get('/api/settings', wrap((req) => settingsPublicas(req.tenantId)));
 app.put('/api/settings', onlyRoles('superadmin', 'admin'), wrap((req) => {
-  for (const [k, v] of Object.entries(req.body || {})) { if (PRIVADAS.test(k)) continue; store.setSetting(req.tenantId, k, v); }
+  for (const [k, v] of Object.entries(req.body || {})) { if (PRIVADAS.test(k)) continue; store.setSetting(req.tenantId, k, k === 'tienda' ? limpiarTienda(req.tenantId, v) : v); }
+  if (req.body && 'tienda' in req.body) avisos.avisarCambio(req.tenantId);
   return settingsPublicas(req.tenantId);
 }));
 
@@ -360,6 +384,8 @@ app.put('/api/admin/tenants/:id', onlyRoles('superadmin'), wrap((req) => {
 
 // ───────────── Frontend ─────────────
 app.use(express.static(path.join(__dirname, '..', 'public')));
+// Fotos de productos (públicas: las muestra la tienda online)
+app.use('/media', express.static(catalogo.MEDIA_DIR, { maxAge: '30d', immutable: true, index: false, dotfiles: 'deny', fallthrough: false }), (_err, _req, res, _next) => res.status(404).end());
 app.get(/^\/(?!api).*/, (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 
 module.exports = app;
