@@ -19,6 +19,7 @@ const ARBOL = {
 };
 const MATERIALES = ['Vidrio', 'Cerámica', 'Acero inoxidable', 'Madera', 'Algodón', 'Lino', 'Metal', 'Fibra natural'];
 const COLORES = ['Blanco', 'Natural', 'Negro', 'Bronce', 'Verde salvia', 'Terracota', 'Gris'];
+const SINGULAR = { Almohadones: 'Almohadón', Faroles: 'Farol', Individuales: 'Individual', Organizadores: 'Organizador', 'Velas LED': 'Vela LED' };
 const ADJ = ['Clásico', 'Nórdico', 'Rústico', 'Liso', 'Texturado', 'Natural', 'Mini', 'Grande', 'Línea Blanca', 'Bicolor'];
 
 function generarDemo() {
@@ -31,7 +32,7 @@ function generarDemo() {
       c.subcategorias.push({ nombre: sub, slug: slug(sub), categoria: c.slug });
       for (let i = 0; i < 4; i++) {
         n++;
-        const nombre = `${sub.replace(/s$/, '')} ${ADJ[(n * 7 + i) % ADJ.length]}`;
+        const nombre = `${SINGULAR[sub] || sub.replace(/s$/, '')} ${ADJ[(n * 7 + i) % ADJ.length]}`;
         const precio = Math.round((1800 + ((n * 7919) % 46000)) / 50) * 50;
         const oferta = n % 6 === 0;
         productos.push({
