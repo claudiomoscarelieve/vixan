@@ -4,6 +4,15 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## 1.6.0 — 24/11/2026
+**Importar productos desde Excel o CSV** (Catálogo → 📥 Importar desde Excel/CSV):
+- Lee .xlsx, .csv (separado por punto y coma, coma o tabulación) y la planilla .xls que exporta Vixan. Sin dependencias nuevas.
+- Reconoce las columnas por su título: SKU, Nombre, Categoría, Subcategoría, Precio, Precio anterior, Se vende por bulto de, Novedad, Stock, Costo, Marca, Fabricante, Código de barras, Peso, Descripción y Fotos. Acepta precios con formato argentino.
+- Primero revisa y muestra nuevos, actualizados, stock inicial, columnas ignoradas y errores por fila; recién después importa.
+- Opciones: marcar para la tienda, cargar el stock inicial como lote (solo en productos nuevos) en el depósito elegido, y actualizar los productos que ya existen sin borrar datos con celdas vacías.
+- Crea las categorías que falten, registra el movimiento de stock y avisa a WooCommerce si está conectado.
+- Plantilla descargable.
+
 ## 1.5.0 + Vixan Tienda 0.4.0 — 24/11/2026
 **Conexión de Vixan con Vixan Tienda**:
 - **Clave de tienda**: se genera en **Vixan Market → Mi tienda** y solo puede leer el catálogo publicado (no ve pedidos, clientes ni el resto de la cuenta). Generar una nueva o desconectar anula la anterior.

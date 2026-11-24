@@ -117,7 +117,7 @@ Los clientes se crean desde el **Panel Vixan**, que solo ve el superadmin. Cada 
 Vixan Tienda es la tienda online de cada cliente (carpeta `tienda/` del repositorio). Muestra los productos que el cliente marca para publicar, con su precio y stock de Vixan.
 
 1. Entrá a la cuenta del cliente (Panel Vixan → **Entrar**).
-2. En **Catálogo**, editá los productos que van a la tienda y marcá **Publicar en la tienda**. Ahí mismo se cargan la subcategoría, la venta por bulto, la descripción y las fotos (una dirección https por línea).
+2. En **Catálogo**, cargá los productos con **📥 Importar desde Excel/CSV** (con la opción *Publicar en la tienda*) o editalos uno por uno y marcá **Publicar en la tienda**. Ahí mismo se cargan la subcategoría, la venta por bulto, la descripción y las fotos (una dirección https por línea).
 3. En **Vixan Market → Mi tienda**, elegí la **lista de precios** de la tienda y tocá **Generar clave de la tienda**. Copiá la clave: no se vuelve a mostrar.
 4. En la configuración de la tienda (`tienda/clientes/<cliente>/config.json`): `"fuente": "vixan"` y `"vixan": { "url": "https://app.vixan.com.ar" }`.
 5. Publicá con la clave en una variable (no se guarda en ningún archivo). Desde Windows, en **cmd**:

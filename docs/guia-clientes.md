@@ -93,6 +93,22 @@ Porcentajes: 45 se escribe 45, no 0,45. Al lado de cada precio ves a qué markup
 
 **Fraccionados.** Para lo que comprás entero y vendés también por partes (una bolsa de 500 g que se vende en 250, 100 y 25 g). **+ Nuevo fraccionado**: elegís el producto entero, cuánto trae y la porción más chica; **Sugerir las habituales** arma las presentaciones (mitad, quinto, décimo…). Cada presentación es un producto con su SKU que podés publicar en la tienda. Su precio es la parte proporcional del entero más un **recargo** (vacío = el habitual: mitad +10 %, quinto +15 %, décimo +30 %, veinteavo +50 %). Al venderla se descuenta su parte del producto entero, así que el stock del entero puede quedar con decimales (por ejemplo 19,5 bolsas). Si una presentación ya existía como producto suelto con stock, ese stock pasa al entero.
 
+## Importar productos desde Excel o CSV
+
+En **Catálogo → 📥 Importar desde Excel/CSV** cargás muchos productos de una vez.
+
+1. Armá un Excel (.xlsx) o CSV con **una fila por producto** y los títulos en la primera fila. Con **Descargar plantilla** bajás uno de ejemplo.
+2. Columnas que reconoce: SKU, Nombre, Categoría, Subcategoría, Precio, Precio anterior, Se vende por bulto de, Novedad, Stock, Costo, Marca, Fabricante, Código de barras, Peso, Descripción y Fotos (direcciones https separadas por espacio). Solo el **SKU** es obligatorio, y el **nombre** si el producto es nuevo. Los precios pueden ir como `12900`, `12.900` o `12.900,50`.
+3. Elegí el archivo y tocá **Revisar archivo**: muestra cuántos productos son nuevos, cuáles se actualizan, el stock inicial y las filas con errores (con el número de fila del Excel), **sin cambiar nada todavía**.
+4. Si está bien, tocá **Importar**.
+
+Opciones:
+- **Publicar en la tienda**: marca todos los productos del archivo para la tienda online.
+- **Stock inicial**: la columna Stock entra como un lote en el depósito elegido, **solo en productos nuevos** (si el SKU ya existía no se suma, para no duplicar stock).
+- **Actualizar existentes**: si el SKU ya está en Vixan, se actualiza con los datos del archivo. Las celdas vacías no borran nada.
+
+Sirve también para actualizar precios en masa: exportá el catálogo, cambiá los precios en Excel y volvé a importarlo. Los archivos .xls muy antiguos hay que guardarlos antes como .xlsx o CSV.
+
 ## Tu tienda online
 
 Si tenés tienda online de Vixan, muestra los productos que marcás para publicar, con el precio de la lista que elijas y el stock disponible.

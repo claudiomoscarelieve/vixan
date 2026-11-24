@@ -456,6 +456,18 @@ function recargoHabitual(fraccion) {
   return 50;
 }
 
+// Importar productos desde Excel / CSV (primero se revisa con probar=true, después se importa)
+router.post('/importar', wrap((req) => {
+  const t = req.tenantId;
+  const b = req.body || {};
+  const r = require('./importar').importar(t, { nombre: b.nombre, contenido: b.contenido, probar: b.probar !== false, publicar: b.publicar !== false, stockInicial: b.stockInicial !== false, actualizar: b.actualizar !== false, deposito: String(b.deposito || 'Central') });
+  if (b.probar === false) {
+    store.logEvent(t, req.user?.id, 'importar_productos', `${b.nombre || 'archivo'}: ${r.nuevos} nuevos, ${r.actualizados} actualizados, ${r.conStock} con stock inicial`);
+    avisarStock(t);
+  }
+  return r;
+}));
+
 // Categorías: asignar en masa
 router.post('/categorias/asignar', wrap((req) => {
   const t = req.tenantId;

@@ -97,10 +97,71 @@ function tabCatalogo(el) {
     beforeSave: (d, row) => { if (!row && d.tipo !== 'unidad') d.componentes = []; return d; },
     toolbar: (ctx) => [
       { label: '🔄 Recalcular precios', onClick: async () => { if (!VG.confirm('Recalcula todos los precios que siguen al markup (costo final × markup) y le pone a cada combo y caja la suma de sus componentes. Los productos con precio fijo quedan igual. ¿Seguimos?')) return; const r = await VG.post('/api/catalogo/recalcular'); VG.toast(`Listo: ${r.precios} precios y ${r.combos} combos/cajas actualizados`); ctx.reload(); } },
+      { label: '📥 Importar desde Excel/CSV', onClick: () => modalImportar(ctx) },
       { label: '🏷️ Categorías', onClick: () => modalCategorias(ctx) },
       { label: 'Exportar por lista de precios', onClick: () => modalExportar(ctx) },
     ],
   });
+}
+
+// ═════════════ Importar productos desde Excel / CSV ═════════════
+const PLANTILLA = [
+  { label: 'SKU', ej: 'BZ-0001' }, { label: 'Nombre', ej: 'Vaso nórdico 350 ml' }, { label: 'Categoría', ej: 'Bazar' }, { label: 'Subcategoría', ej: 'Vasos' },
+  { label: 'Precio', ej: '9700' }, { label: 'Precio anterior', ej: '' }, { label: 'Se vende por bulto de', ej: '6' }, { label: 'Novedad', ej: 'Sí' },
+  { label: 'Stock', ej: '120' }, { label: 'Costo', ej: '5200' }, { label: 'Marca', ej: '' }, { label: 'Descripción', ej: 'Vaso de vidrio templado, apto lavavajillas.' },
+  { label: 'Fotos', ej: 'https://misitio.com/fotos/vaso1.jpg' },
+];
+function modalImportar(ctx) {
+  const body = VG.h(`<div>
+    <p>Subí un Excel (.xlsx) o un CSV con <b>una fila por producto</b> y los títulos en la primera fila. Solo el <b>SKU</b> es obligatorio (y el nombre, si el producto es nuevo). Las columnas que reconoce: ${PLANTILLA.map((c) => `<code class="k" style="white-space:nowrap">${esc(c.label)}</code>`).join(' ')}. <a href="#" data-plantilla>Descargar plantilla</a></p>
+    <label class="full" style="display:block;margin:12px 0"><input type="file" accept=".xlsx,.csv,.txt,.xls" data-archivo></label>
+    <div class="form">
+      <label class="check full"><input type="checkbox" data-publicar checked><span>Marcar los productos para <b>publicar en la tienda</b></span></label>
+      <label class="check full"><input type="checkbox" data-stock checked><span>Cargar la columna Stock como <b>stock inicial</b> (solo en productos nuevos)</span></label>
+      <label class="check full"><input type="checkbox" data-actualizar checked><span>Si el SKU ya existe, <b>actualizar</b> el producto con los datos del archivo (las celdas vacías no borran nada)</span></label>
+      <label>Depósito del stock inicial<select data-deposito><option>Central</option></select></label>
+    </div>
+    <div data-resultado style="margin-top:14px"></div>
+  </div>`);
+  const q = (x) => body.querySelector(x);
+  VG.get('/api/r/depositos').then((ds) => { const nombres = [...new Set(['Central', ...ds.map((d) => d.nombre).filter(Boolean)])]; q('[data-deposito]').innerHTML = nombres.map((n) => `<option>${esc(n)}</option>`).join(''); }).catch(() => {});
+  q('[data-plantilla]').onclick = (e) => { e.preventDefault(); VG.exportCSV('plantilla-productos-vixan', PLANTILLA.map((c, i) => ({ label: c.label, k: String(i) })), [Object.fromEntries(PLANTILLA.map((c, i) => [String(i), c.ej]))]); };
+  let archivo = null; let revisado = null;
+  const opciones = () => ({ publicar: q('[data-publicar]').checked, stockInicial: q('[data-stock]').checked, actualizar: q('[data-actualizar]').checked, deposito: q('[data-deposito]').value });
+  const leer = (f) => new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = () => mal(new Error('No se pudo leer el archivo')); r.readAsDataURL(f); });
+  body.appendChild(VG.h('<div class="toolbar" style="margin-top:14px;justify-content:flex-end"><button class="btn" data-cerrar>Cancelar</button><button class="btn primary" data-ok>Revisar archivo</button></div>'));
+  const m = VG.modal({ title: 'Importar productos', body, wide: true, footer: false });
+  const btn = q('[data-ok]');
+  q('[data-cerrar]').onclick = () => m.close();
+  const reiniciar = () => { revisado = null; btn.disabled = false; btn.textContent = 'Revisar archivo'; q('[data-resultado]').innerHTML = ''; };
+  btn.onclick = async () => {
+    if (!archivo) return VG.toast('Elegí un archivo', true);
+    const texto = btn.textContent; btn.disabled = true;
+    try {
+      if (!revisado) {
+        btn.textContent = 'Revisando…';
+        revisado = await VG.post('/api/catalogo/importar', { nombre: archivo.nombre, contenido: archivo.contenido, probar: true, ...opciones() });
+        mostrar(revisado);
+        return;
+      }
+      btn.textContent = 'Importando…';
+      const r = await VG.post('/api/catalogo/importar', { nombre: archivo.nombre, contenido: archivo.contenido, probar: false, ...opciones() });
+      VG.toast(`Importados: ${r.nuevos} nuevos, ${r.actualizados} actualizados${r.conStock ? `, stock inicial en ${r.conStock}` : ''}`);
+      VG.cache.productos = await VG.get('/api/r/productos');
+      m.close(); ctx.reload();
+    } catch (e) { VG.toast(e.message, true); btn.disabled = false; btn.textContent = texto; }
+  };
+  q('[data-archivo]').onchange = async (e) => { const f = e.target.files[0]; reiniciar(); archivo = f ? { nombre: f.name, contenido: await leer(f) } : null; };
+  body.querySelectorAll('input[type=checkbox], select').forEach((x) => x.addEventListener('change', reiniciar));
+  function mostrar(r) {
+    const total = r.nuevos + r.actualizados;
+    q('[data-resultado]').innerHTML = `<div class="grid g4" style="margin-bottom:10px">${VG.kpi({ label: 'Nuevos', value: r.nuevos, tone: 'teal' })}${VG.kpi({ label: 'Se actualizan', value: r.actualizados })}${VG.kpi({ label: 'Con stock inicial', value: r.conStock, sub: r.stockTotal ? `${VG.n(r.stockTotal)} unidades` : '' })}${VG.kpi({ label: 'Con errores', value: r.errores.length, tone: r.errores.length ? 'err' : '' })}</div>
+      ${r.ignoradas.length ? `<div class="note">Columnas que no se usan: ${r.ignoradas.map((x) => `<code class="k">${esc(x)}</code>`).join(' ')}</div>` : ''}
+      ${r.errores.length ? `<div class="note warn"><b>Filas que no se importan:</b><br>${r.errores.slice(0, 30).map((e) => `Fila ${e.fila}${e.sku ? ` (${esc(e.sku)})` : ''}: ${esc(e.error)}`).join('<br>')}${r.errores.length > 30 ? `<br>… y ${r.errores.length - 30} más` : ''}</div>` : ''}
+      ${r.avisos.length ? `<div class="note">${r.avisos.slice(0, 10).map((a) => `${a.fila ? `Fila ${a.fila} (${esc(a.sku)}): ` : ''}${esc(a.aviso)}`).join('<br>')}${r.avisos.length > 10 ? `<br>… y ${r.avisos.length - 10} avisos más` : ''}</div>` : ''}
+      ${r.ejemplos.length ? `<table class="t"><thead><tr><th>Fila</th><th>SKU</th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock inicial</th><th></th></tr></thead><tbody>${r.ejemplos.map((x) => `<tr><td>${x.fila}</td><td><code class="k">${esc(x.sku)}</code></td><td>${esc(x.nombre || '')}</td><td>${esc(x.categoria || '—')}</td><td class="num">${x.precio == null ? '—' : money(x.precio)}</td><td class="num">${x.stock == null ? '—' : VG.n(x.stock)}</td><td>${badge(x.accion, x.accion === 'Nuevo' ? 'ok' : 'info')}</td></tr>`).join('')}</tbody></table><div class="small muted" style="margin-top:4px">Primeras ${r.ejemplos.length} filas de ${total}.</div>` : ''}`;
+    btn.disabled = !total; btn.textContent = total ? `Importar ${total} producto${total === 1 ? '' : 's'}` : 'Nada para importar';
+  }
 }
 
 function modalCategorias(ctx) {
