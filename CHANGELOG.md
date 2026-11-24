@@ -4,6 +4,10 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## Vixan Tienda 0.2.1 — 24/11/2026
+- Instalador `tienda/deploy/instalar.sh` (Node 22, servicio propio, HTTPS con Caddy para el dominio y www, firewall) y `tienda/deploy/actualizar.sh`.
+- Varias tiendas, y también Vixan, pueden convivir en el mismo servidor: cada tienda tiene su puerto y su archivo en `/etc/caddy/sitios/`. El instalador de Vixan ahora incluye esos archivos.
+
 ## Vixan Tienda 0.2.0 — 24/11/2026
 **Página de producto** completa:
 - Galería con contador, flechas, miniaturas, zoom al pasar el mouse y visor a pantalla completa.

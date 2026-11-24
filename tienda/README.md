@@ -43,3 +43,18 @@ Copiá `config.ejemplo.json` como `config.json` (no se sube al repositorio porqu
 - `src/vistas.js`: la plantilla (páginas generadas en el servidor, sin dependencias).
 - `src/datos.js`: fuente de datos. Las vistas solo usan sus funciones, así que pasar del catálogo de ejemplo a la API de Vixan no toca la plantilla.
 - `public/tienda.css` y `public/tienda.js`: estilos y comportamiento en el navegador.
+
+## Instalar en un servidor
+
+Servidor Ubuntu 24.04 con acceso root. Primero, en Cloudflare, crear dos registros **A** (`@` y `www`) que apunten a la IP del servidor, con la nube en **gris** (solo DNS) hasta que la tienda abra con https.
+
+```bash
+# desde la carpeta de la tienda, como root
+bash deploy/instalar.sh tutiendaconia.com.ar tu@email.com
+nano /opt/tienda-tutiendaconia-com-ar/config.json      # datos de la tienda
+systemctl restart tienda-tutiendaconia-com-ar
+```
+
+Actualizar con código nuevo: `bash deploy/actualizar.sh tutiendaconia.com.ar` (no toca `config.json`).
+
+Puede convivir con Vixan u otras tiendas en el mismo servidor: cada una usa su puerto (tercer parámetro, 3100 por defecto) y su archivo en `/etc/caddy/sitios/`.

@@ -154,7 +154,7 @@ if ! command -v caddy >/dev/null; then
   apt-get update -qq && apt-get install -y -qq caddy >/dev/null
 fi
 mkdir -p /var/log/caddy && { chown caddy:caddy /var/log/caddy 2>/dev/null || true; }
-mkdir -p /etc/caddy
+mkdir -p /etc/caddy/sitios
 cat > /etc/caddy/Caddyfile <<EOF
 {
 	email $EMAIL
@@ -170,6 +170,9 @@ $DOMINIO {
 		}
 	}
 }
+
+# Tiendas de Vixan Tienda instaladas en este mismo servidor
+import sitios/*.caddy
 EOF
 systemctl enable caddy >/dev/null 2>&1
 systemctl restart caddy
