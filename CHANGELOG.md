@@ -4,6 +4,13 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## Vixan Tienda 0.1.0 — 24/11/2026
+Primera versión de **Vixan Tienda** (carpeta `tienda/`), la vidriera que se instala en el servidor de cada cliente:
+- Plantilla base con estilo neutro de Vixan, personalizable por cliente desde `config.json` (logo, colores, tipografía, avisos, banners, contacto, condiciones mayoristas).
+- Home con barra de avisos, categorías con grilla de subcategorías, banners y bloques de ofertas; páginas de categoría, producto, búsqueda, ofertas, novedades, lo más pedido y mayoristas.
+- Pedido con venta por bulto, compra mínima inicial, descuento por volumen e IVA, y envío por WhatsApp; favoritos; botón flotante de WhatsApp.
+- Usa un catálogo de ejemplo hasta que exista la API pública de Vixan.
+
 ## 1.4.0 — 19/11/2026
 **Catálogo y precios**, con las seis pestañas como en OnBox:
 - **Catálogo**: filtros por fabricante, marca, categoría y tipo; ficha de cada producto con costos, margen y precio en cada lista; recalcular precios; categorías en masa; exportar por lista de precios (Excel o PDF).
