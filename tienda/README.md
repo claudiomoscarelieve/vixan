@@ -2,7 +2,7 @@
 
 Vidriera de e-commerce de cada cliente de Vixan. Se instala en el **servidor propio del cliente** y toma catálogo, precios y stock de Vixan (servidor central multicliente).
 
-> Versión 0.2.0: plantilla base con catálogo de ejemplo. La conexión con la API de Vixan, el checkout con Mercado Pago y las cuentas de clientes llegan en las próximas etapas.
+> Versión 0.3.0: plantilla base con catálogo de ejemplo. La conexión con la API de Vixan, el checkout con Mercado Pago y las cuentas de clientes llegan en las próximas etapas.
 
 ## Probarla
 
@@ -44,7 +44,40 @@ Copiá `config.ejemplo.json` como `config.json` (no se sube al repositorio porqu
 - `src/datos.js`: fuente de datos. Las vistas solo usan sus funciones, así que pasar del catálogo de ejemplo a la API de Vixan no toca la plantilla.
 - `public/tienda.css` y `public/tienda.js`: estilos y comportamiento en el navegador.
 
-## Instalar en un servidor
+## Dos formas de publicar
+
+| | Hosting compartido (PHP, por FTP) | Servidor con Node (VPS) |
+|---|---|---|
+| Costo | El más barato | Más caro |
+| Precios y stock | Se actualizan cada vez que se publica | Al instante |
+| Mantenimiento | Ninguno en el hosting | Hay que cuidar el servidor |
+| Comando | `node publicar.js` | `bash deploy/instalar.sh` |
+
+La plantilla es la misma en los dos casos.
+
+## Hosting compartido (PHP, por FTP)
+
+La tienda se genera como páginas HTML y se sube por FTP. Sirve cualquier hosting con Apache (el de casi todos los planes PHP). La búsqueda y el orden de los listados funcionan en el navegador; el pedido, los favoritos y WhatsApp funcionan igual.
+
+1. En `config.json` → `ftp`, completá servidor, puerto, usuario y carpeta (normalmente `/public_html`, o la carpeta del subdominio). `seguro: true` usa FTPS; si el hosting no lo soporta, poné `false`.
+2. Publicá, con la contraseña en una variable (no queda guardada en ningún archivo):
+
+```bash
+# Linux / Mac
+VIXAN_FTP_CLAVE='la-contraseña' node publicar.js --probar   # muestra qué va a subir, sin tocar nada
+VIXAN_FTP_CLAVE='la-contraseña' node publicar.js
+
+# Windows (cmd)
+set VIXAN_FTP_CLAVE=la-contraseña
+node publicar.js
+```
+
+- Solo sube los archivos que cambiaron desde la última vez y borra solo los que la tienda subió antes (lista en `vixan-manifiesto.json`, que no es visible desde la web).
+- Si la carpeta ya tiene otro sitio (por ejemplo, un WordPress), se detiene y avisa. Con `--forzar` publica igual; el `.htaccess` anterior se guarda como `.htaccess.vixan-respaldo`.
+- `node exportar.js` genera la tienda en la carpeta `dist/` sin subirla, por si querés subirla a mano con FileZilla.
+- En Cloudflare, el dominio apunta a la IP del hosting (registros A de `@` y `www`). El `.htaccess` fuerza https y redirige `www` al dominio.
+
+## Instalar en un servidor con Node
 
 Servidor Ubuntu 24.04 con acceso root. Primero, en Cloudflare, crear dos registros **A** (`@` y `www`) que apunten a la IP del servidor, con la nube en **gris** (solo DNS) hasta que la tienda abra con https.
 

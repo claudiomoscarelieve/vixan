@@ -133,16 +133,20 @@ function inicio(cfg, fuente) {
   });
 }
 
-function listado(cfg, fuente, { titulo, bajada, items, filtros, actual, q }) {
+function listado(cfg, fuente, { titulo, bajada, items, filtros, actual, q, buscarEnNavegador = false }) {
   const ordenes = [['', 'Destacados'], ['precio-asc', 'Menor precio'], ['precio-desc', 'Mayor precio'], ['nombre', 'Nombre A-Z']];
-  const lista = fuente.productos(filtros);
+  const lista = buscarEnNavegador ? [] : fuente.productos(filtros);
+  const cantidad = `<span data-cantidad>${buscarEnNavegador ? '' : `${lista.length} producto${lista.length === 1 ? '' : 's'}`}</span>`;
+  const opciones = ordenes.map(([v, t]) => `<option value="${v}"${filtros.orden === v ? ' selected' : ''}>${t}</option>`).join('');
+  // En la tienda estática (hosting PHP/FTP) el orden se aplica en el navegador.
+  const orden = cfg._estatico
+    ? `<div class="orden">${cantidad}<select data-orden-local aria-label="Ordenar">${opciones}</select></div>`
+    : `<form class="orden">${q ? `<input type="hidden" name="q" value="${esc(q)}">` : ''}${cantidad}<select name="orden" onchange="this.form.submit()" aria-label="Ordenar">${opciones}</select></form>`;
   return layout(cfg, fuente, {
     titulo, actual,
     cuerpo: `<div class="envoltura pagina">${migas(items)}
-  <div class="pagina-cab"><div><h1>${esc(titulo)}</h1>${bajada || ''}</div>
-  <form class="orden">${q ? `<input type="hidden" name="q" value="${esc(q)}">` : ''}<span>${lista.length} producto${lista.length === 1 ? '' : 's'}</span>
-    <select name="orden" onchange="this.form.submit()" aria-label="Ordenar">${ordenes.map(([v, t]) => `<option value="${v}"${filtros.orden === v ? ' selected' : ''}>${t}</option>`).join('')}</select></form></div>
-  ${grilla(lista, cfg)}</div>`,
+  <div class="pagina-cab"><div><h1 data-titulo>${esc(titulo)}</h1>${bajada || ''}</div>${orden}</div>
+  ${buscarEnNavegador ? '<div class="grilla" data-buscar-estatico></div><p class="vacio" data-sin-resultados hidden>No encontramos productos.</p>' : grilla(lista, cfg)}</div>`,
   });
 }
 
@@ -300,4 +304,4 @@ function placeholder(texto) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="hsl(${tono} 30% 94%)"/><circle cx="200" cy="185" r="92" fill="hsl(${tono} 32% 86%)"/><rect x="128" y="292" width="144" height="14" rx="7" fill="hsl(${tono} 25% 84%)"/><text x="200" y="215" text-anchor="middle" font-family="system-ui,sans-serif" font-size="88" font-weight="600" fill="hsl(${tono} 28% 48%)">${inicial}</text></svg>`;
 }
 
-module.exports = { inicio, listado, categoria, producto, mayoristas, cuenta, noEncontrado, placeholder };
+module.exports = { tarjeta, inicio, listado, categoria, producto, mayoristas, cuenta, noEncontrado, placeholder };

@@ -4,6 +4,13 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## Vixan Tienda 0.3.0 — 24/11/2026
+**Versión estática para hostings compartidos (PHP, por FTP)**:
+- `node exportar.js` genera toda la tienda como páginas HTML (home, categorías, productos, listados, mayoristas, 404, sitemap y `.htaccess`).
+- `node publicar.js` la sube por FTP o FTPS y solo manda los archivos que cambiaron. `--probar` muestra qué haría sin tocar nada.
+- Protección: si la carpeta del hosting tiene otro sitio, se detiene; nunca borra archivos que no subió la tienda.
+- Búsqueda y orden de los listados en el navegador.
+
 ## Vixan Tienda 0.2.1 — 24/11/2026
 - Instalador `tienda/deploy/instalar.sh` (Node 22, servicio propio, HTTPS con Caddy para el dominio y www, firewall) y `tienda/deploy/actualizar.sh`.
 - Varias tiendas, y también Vixan, pueden convivir en el mismo servidor: cada tienda tiene su puerto y su archivo en `/etc/caddy/sitios/`. El instalador de Vixan ahora incluye esos archivos.

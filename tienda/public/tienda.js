@@ -224,5 +224,40 @@
     try { await navigator.clipboard.writeText(b.dataset.copiar); aviso('Enlace copiado'); } catch { aviso(b.dataset.copiar); }
   });
 
+  // ---------- Tienda estática (hosting PHP/FTP): orden y búsqueda en el navegador ----------
+  const selOrden = $('[data-orden-local]');
+  if (selOrden) {
+    const grillaEl = () => $('.pagina .grilla');
+    const g0 = grillaEl();
+    if (g0) [...g0.children].forEach((c, i) => { c.dataset.pos = i; });
+    selOrden.addEventListener('change', () => {
+      const g = grillaEl(); if (!g) return;
+      const dato = (el) => JSON.parse(el.dataset.prod);
+      const cmp = {
+        'precio-asc': (a, b) => dato(a).precio - dato(b).precio,
+        'precio-desc': (a, b) => dato(b).precio - dato(a).precio,
+        nombre: (a, b) => dato(a).nombre.localeCompare(dato(b).nombre, 'es'),
+      }[selOrden.value] || ((a, b) => a.dataset.pos - b.dataset.pos);
+      [...g.children].sort(cmp).forEach((c) => g.appendChild(c));
+    });
+  }
+
+  const cajaBuscar = $('[data-buscar-estatico]');
+  if (cajaBuscar) {
+    const q = new URLSearchParams(location.search).get('q') || '';
+    const normal = (t) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const terminos = normal(q).split(/[^a-z0-9]+/).filter(Boolean);
+    const inp = $('.buscador input'); if (inp) inp.value = q;
+    if (q) { $('[data-titulo]').textContent = `Resultados para “${q}”`; document.title = `${q} · ${T.nombre}`; }
+    fetch('/datos/buscar.json').then((r) => r.json()).then((indice) => {
+      const r = terminos.length ? indice.filter((p) => { const t = normal(p.t); return terminos.every((x) => t.includes(x)); }) : [];
+      cajaBuscar.innerHTML = r.map((p) => p.html).join('');
+      [...cajaBuscar.children].forEach((c, i) => { c.dataset.pos = i; });
+      $('[data-cantidad]').textContent = `${r.length} producto${r.length === 1 ? '' : 's'}`;
+      $('[data-sin-resultados]').hidden = r.length > 0;
+      pintar();
+    }).catch(() => { $('[data-sin-resultados]').hidden = false; });
+  }
+
   pintar();
 })();

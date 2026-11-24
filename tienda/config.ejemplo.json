@@ -8,6 +8,15 @@
     "clave": "PEGAR-AQUI-LA-CLAVE-DE-API-DEL-CLIENTE"
   },
 
+  "_ftp": "Solo para la versión estática (hosting PHP): node publicar.js. La contraseña va en la variable VIXAN_FTP_CLAVE.",
+  "ftp": {
+    "host": "ftp.tutiendaconia.com.ar",
+    "puerto": 21,
+    "usuario": "usuario-ftp",
+    "carpeta": "/public_html",
+    "seguro": true
+  },
+
   "tienda": {
     "nombre": "Tu Marca",
     "url": "https://www.tumarca.com.ar",
