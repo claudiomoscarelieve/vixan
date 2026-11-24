@@ -53,7 +53,7 @@ function banner(b, extra = '') {
 const migas = (items) => `<nav class="migas"><a href="/">Inicio</a>${items.map(([t, h]) => h ? ` / <a href="${esc(h)}">${esc(t)}</a>` : ` / <span>${esc(t)}</span>`).join('')}</nav>`;
 
 // ---------- Estructura común ----------
-function layout(cfg, fuente, { titulo, descripcion, cuerpo, actual = '' }) {
+function layout(cfg, fuente, { titulo, descripcion, cuerpo, actual = '', cabeza = '' }) {
   const t = cfg.tienda;
   const cats = fuente.categorias();
   const avisos = (cfg.avisos || []).map((a) => `<span>${esc(a)}</span>`).join('');
@@ -66,7 +66,7 @@ function layout(cfg, fuente, { titulo, descripcion, cuerpo, actual = '' }) {
   return `<!doctype html><html lang="es-AR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulo ? `${titulo} · ${t.nombre}` : t.nombre)}</title>
 <meta name="description" content="${esc(descripcion || t.eslogan || '')}">
-<style>${cssTema(cfg.tema)}</style><link rel="stylesheet" href="/tienda.css">
+${cabeza}<style>${cssTema(cfg.tema)}</style><link rel="stylesheet" href="/tienda.css">
 </head><body>
 <a class="saltar" href="#contenido">Ir al contenido</a>
 ${avisos ? `<div class="avisos"><div class="avisos-pista">${avisos}${avisos}</div></div>` : ''}
@@ -157,33 +157,105 @@ function categoria(cfg, fuente, cat, sub, orden) {
   });
 }
 
-function producto(cfg, fuente, p) {
+function producto(cfg, fuente, p, urlAbsoluta = '') {
+  const t = cfg.tienda;
+  const compra = cfg.compra || {};
   const cat = fuente.categoria(p.categoria);
   const sub = cat?.subcategorias.find((s) => s.slug === p.subcategoria);
   const relacionados = fuente.productos({ subcategoria: p.subcategoria }).filter((x) => x.id !== p.id).slice(0, 4);
   const imgs = p.imagenes?.length ? p.imagenes : [img(p)];
   const datos = esc(JSON.stringify({ id: p.id, nombre: p.nombre, sku: p.sku, precio: p.precio, multiplo: p.multiplo, imagen: img(p), slug: p.slug }));
   const wa = cfg.contacto?.whatsapp;
+  const ocultarPrecio = !!t.preciosSoloClientes; // hasta que existan las cuentas, se ve el botón de ingreso
+  const coleccion = sub?.nombre || cat?.nombre || '';
+  const modalidad = compra.modalidad || 'Venta mayorista';
+  const pocas = p.stock > 0 && p.stock <= (compra.avisoPocasUnidades || 10);
+  const d = t.descuentoPorVolumen;
+  const caracteristicas = [['Producto', p.nombre], ['Referencia', p.sku], ['Colección', coleccion], ...(p.caracteristicas || []),
+    ['Venta por', p.multiplo > 1 ? `Bulto de ${p.multiplo} unidades` : 'Unidad'], ['Modalidad', modalidad]];
+  const u = encodeURIComponent(urlAbsoluta);
+  const txt = encodeURIComponent(p.nombre);
+  const compartir = [
+    ['Facebook', `https://www.facebook.com/sharer/sharer.php?u=${u}`, 'M14 8h3V4h-3c-2.8 0-4 1.7-4 4.3V10H7v4h3v7h4v-7h3l1-4h-4V8.6c0-.4.3-.6.7-.6Z'],
+    ['X', `https://twitter.com/intent/tweet?url=${u}&text=${txt}`, 'M4 4l16 16M20 4 4 20'],
+    ['LinkedIn', `https://www.linkedin.com/sharing/share-offsite/?url=${u}`, 'M6 9v11M6 5v.01M10 20v-6a3 3 0 0 1 6 0v6M10 10v10'],
+    ['WhatsApp', `https://wa.me/?text=${txt}%20${u}`, 'M4 20l1.3-4A8 8 0 1 1 8 18.7Z'],
+    ['Pinterest', `https://pinterest.com/pin/create/button/?url=${u}&description=${txt}`, 'M12 3a9 9 0 0 0-3.3 17.4M10 21l2.2-8.6M9.5 13.5c.6 1.5 4.5 1.8 5.5-1.5 1-3.4-1.3-6-4.5-5.5'],
+    ['Email', `mailto:?subject=${txt}&body=${u}`, 'M3 6h18v12H3zM3 7l9 6 9-6'],
+  ];
+  const ld = { '@context': 'https://schema.org', '@type': 'Product', name: p.nombre, sku: p.sku, description: p.descripcion, image: imgs,
+    ...(ocultarPrecio ? {} : { offers: { '@type': 'Offer', priceCurrency: 'ARS', price: p.precio, availability: `https://schema.org/${p.stock ? 'InStock' : 'OutOfStock'}`, url: urlAbsoluta } }) };
+
+  const bloquePrecio = ocultarPrecio
+    ? `<div class="precio-oculto"><b>Precios exclusivos para mayoristas</b><span>Ingresá para ver el precio y armar tu pedido.</span><a class="btn" href="/cuenta">Ingresar para comprar</a></div>`
+    : `<div class="prod-precio grande">${p.precioAnterior ? `<s>${pesos(p.precioAnterior)}</s>` : ''}<b>${pesos(p.precio)}</b><small>${etiquetaIva(cfg)} · por unidad</small></div>
+      ${p.multiplo > 1 ? `<p class="precio-bulto">Bulto x${p.multiplo}: <b>${pesos(p.precio * p.multiplo)}</b> ${etiquetaIva(cfg)}</p>` : ''}`;
+
+  const bloqueCompra = ocultarPrecio || !p.stock ? '' : `<div class="prod-comprar"><div class="cant"><button type="button" data-menos aria-label="Menos">−</button><input type="number" value="${p.multiplo}" min="${p.multiplo}" step="${p.multiplo}" aria-label="Cantidad"><button type="button" data-mas aria-label="Más">+</button></div><button class="btn btn-agregar" type="button" data-agregar>Agregar al pedido</button></div>
+      ${p.multiplo > 1 ? `<p class="nota-mult">Se vende en múltiplos de ${p.multiplo} unidades.</p>` : ''}`;
+
   return layout(cfg, fuente, {
     titulo: p.nombre, descripcion: p.descripcion, actual: p.categoria,
-    cuerpo: `<div class="envoltura pagina">${migas([[cat?.nombre, `/c/${cat?.slug}`], ...(sub ? [[sub.nombre, `/c/${cat.slug}/${sub.slug}`]] : []), [p.nombre]])}
+    cabeza: `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>${imgs[0] ? `<meta property="og:image" content="${esc(imgs[0])}">` : ''}<meta property="og:title" content="${esc(p.nombre)}">`,
+    cuerpo: `<div class="envoltura pagina">
+  <div class="migas-fila">${migas([['Tienda', '/catalogo'], [cat?.nombre, `/c/${cat?.slug}`], ...(sub ? [[sub.nombre, `/c/${cat.slug}/${sub.slug}`]] : []), [p.nombre]])}
+    ${sub || cat ? `<a class="ver-todo" href="/c/${cat.slug}${sub ? `/${sub.slug}` : ''}">Ver más de ${esc(coleccion)} ${ICON.flecha}</a>` : ''}</div>
   <div class="ficha" data-prod="${datos}">
-    <div class="ficha-galeria"><img class="ficha-img" src="${esc(imgs[0])}" alt="${esc(p.nombre)}">${imgs.length > 1 ? `<div class="miniaturas">${imgs.map((u) => `<img src="${esc(u)}" alt="" data-ver>`).join('')}</div>` : ''}</div>
+    <div class="ficha-galeria" data-galeria>
+      <div class="galeria-principal">
+        <img class="ficha-img" src="${esc(imgs[0])}" alt="${esc(p.nombre)}" data-zoom>
+        ${imgs.length > 1 ? `<button class="gal-flecha izq" type="button" data-gal="-1" aria-label="Anterior">${ICON.flecha}</button><button class="gal-flecha der" type="button" data-gal="1" aria-label="Siguiente">${ICON.flecha}</button>` : ''}
+        <span class="gal-contador"><b data-gal-actual>1</b> / ${imgs.length}</span>
+        <button class="gal-ampliar" type="button" data-ampliar aria-label="Ampliar imagen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      </div>
+      ${imgs.length > 1 ? `<div class="miniaturas">${imgs.map((src, i) => `<button type="button" class="${i ? '' : 'activa'}" data-ver="${i}"><img src="${esc(src)}" alt="Imagen ${i + 1}"></button>`).join('')}</div>` : ''}
+      <script type="application/json" data-imagenes>${JSON.stringify(imgs).replace(/</g, '\\u003c')}</script>
+    </div>
+
     <div class="ficha-info">
-      <span class="prod-sku">SKU ${esc(p.sku)}</span>
       <h1>${esc(p.nombre)}</h1>
-      <div class="prod-precio grande">${p.precioAnterior ? `<s>${pesos(p.precioAnterior)}</s>` : ''}<b>${pesos(p.precio)}</b><small>${etiquetaIva(cfg)}</small></div>
-      <ul class="ficha-datos">
-        <li><span>Venta por</span><b>${p.multiplo > 1 ? `bulto de ${p.multiplo} unidades` : 'unidad'}</b></li>
-        <li><span>Disponibilidad</span><b class="${p.stock ? 'ok' : 'sin'}">${p.stock ? 'En stock' : 'Sin stock'}</b></li>
+      <span class="ficha-ref">Cód. ${esc(p.sku)} · ${esc(modalidad)}</span>
+      ${bloquePrecio}
+      <div class="ficha-stock ${p.stock ? (pocas ? 'pocas' : 'ok') : 'sin'}"><i></i><div><b>${p.stock ? (pocas ? `Últimas ${p.stock} unidades` : 'Stock disponible') : 'Sin stock'}</b><span>${p.stock ? (compra.disponibilidad || 'Disponibilidad mayorista inmediata') : 'Consultanos por la próxima reposición'}</span></div></div>
+      ${bloqueCompra}
+      <div class="ficha-acciones">
+        <button class="btn btn-sec" type="button" data-fav="${p.id}">${ICON.corazon}<span data-fav-txt>Agregar a la lista de deseos</span></button>
+        ${wa ? `<a class="btn btn-sec" target="_blank" rel="noopener" href="https://wa.me/${esc(wa)}?text=${encodeURIComponent(`Hola, quiero consultar por ${p.nombre} (Cód. ${p.sku}).`)}">${ICON.whatsapp} Consultar</a>` : ''}
+      </div>
+
+      ${t.compraMinimaInicial ? `<div class="meta-compra" data-meta-minimo="${t.compraMinimaInicial}">
+        <div class="meta-cab"><span>Te falta para tu compra inicial</span><b>${pesos(t.compraMinimaInicial)}${t.precioConIva ? '' : ' + IVA'}</b></div>
+        <i><b data-meta-barra style="width:0%"></b></i><small data-meta-texto>Faltan ${pesos(t.compraMinimaInicial)} para alcanzar el mínimo.</small>
+        ${d ? `<div class="meta-desc">${ICON.flecha}<span><b>${d.porcentaje}% OFF por volumen</b> en compras desde ${pesos(d.desde)}${t.precioConIva ? '' : ' + IVA'}</span></div>` : ''}
+      </div>` : ''}
+
+      <div class="saber"><h3>Lo que tenés que saber</h3>
+        <dl><dt>Colección</dt><dd>${esc(coleccion)}</dd><dt>Código</dt><dd>${esc(p.sku)}</dd><dt>Modalidad</dt><dd>${esc(compra.modalidadDetalle || 'Venta exclusiva a comercios y revendedores mayoristas')}</dd></dl>
+        <a class="ver-todo" href="#caracteristicas">Ver todas las características ${ICON.flecha}</a>
+      </div>
+
+      <ul class="ficha-servicios">
+        <li><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg><div><b>${esc(compra.pagos || 'Pago con Mercado Pago o transferencia')}</b><a href="/mayoristas#pagos">Ver información de pago</a></div></li>
+        <li><svg viewBox="0 0 24 24"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg><div><b>${esc(compra.envios || 'Envíos a todo el país')}</b><span>${esc(compra.despacho || 'Despachamos al acreditarse el pago; el costo del envío se coordina con la tienda.')}</span></div></li>
+        ${compra.devolucion !== '' ? `<li><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg><div><b>${esc(compra.devolucion || 'Garantía de devolución de 30 días')}</b><a href="${esc(compra.terminos || '/mayoristas#terminos')}">Términos y condiciones</a></div></li>` : ''}
       </ul>
-      ${p.stock ? `<div class="prod-comprar"><div class="cant"><button type="button" data-menos>−</button><input type="number" value="${p.multiplo}" min="${p.multiplo}" step="${p.multiplo}" aria-label="Cantidad"><button type="button" data-mas>+</button></div><button class="btn btn-agregar" type="button" data-agregar>Agregar al pedido</button></div>` : ''}
-      <div class="ficha-acciones"><button class="btn btn-sec" type="button" data-fav="${p.id}">${ICON.corazon} Favorito</button>${wa ? `<a class="btn btn-sec" target="_blank" rel="noopener" href="https://wa.me/${esc(wa)}?text=${encodeURIComponent(`Hola, quiero consultar por ${p.nombre} (${p.sku}).`)}">${ICON.whatsapp} Consultar</a>` : ''}</div>
-      <div class="ficha-desc"><h3>Descripción</h3><p>${esc(p.descripcion)}</p></div>
+
+      <div class="compartir"><span>Compartir</span>${compartir.map(([n, href, d]) => `<a href="${esc(href)}" target="_blank" rel="noopener" aria-label="Compartir en ${n}" title="${n}"><svg viewBox="0 0 24 24"><path d="${d}"/></svg></a>`).join('')}<button type="button" data-copiar="${esc(urlAbsoluta)}" aria-label="Copiar enlace" title="Copiar enlace"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button></div>
     </div>
   </div>
-  ${relacionados.length ? `<section class="seccion"><div class="seccion-cab"><h2>También te puede interesar</h2></div>${grilla(relacionados, cfg)}</section>` : ''}
-</div>`,
+
+  <div class="ficha-detalle">
+    <section class="ficha-desc"><h2>Descripción</h2><p>${esc(p.descripcion)}</p></section>
+    <section id="caracteristicas"><h2>Características del producto</h2>
+      <table class="tabla-car">${caracteristicas.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table></section>
+    ${wa ? `<aside class="ayuda-wa">${ICON.whatsapp}<div><b>¿Te ayudamos con tu pedido?</b><span>Atención mayorista ${esc(t.nombre)}${cfg.contacto?.horario ? ` · ${esc(cfg.contacto.horario)}` : ''}</span></div><a class="btn" target="_blank" rel="noopener" href="https://wa.me/${esc(wa)}?text=${encodeURIComponent(`Hola, necesito ayuda con mi pedido. Estoy viendo ${p.nombre} (Cód. ${p.sku}).`)}">Escribinos</a></aside>` : ''}
+  </div>
+
+  ${relacionados.length ? `<section class="seccion"><div class="seccion-cab"><div><h2>También te puede interesar</h2><p>Más de ${esc(coleccion)}</p></div><a class="ver-todo" href="/c/${cat.slug}${sub ? `/${sub.slug}` : ''}">Ver todo ${ICON.flecha}</a></div>${grilla(relacionados, cfg)}</section>` : ''}
+  <section class="seccion" data-vistos hidden><div class="seccion-cab"><h2>Vistos recientemente</h2></div><div class="grilla-mini" data-vistos-lista></div></section>
+</div>
+${bloqueCompra ? `<div class="barra-compra" data-barra-compra><div><b>${pesos(p.precio)}</b><small>${etiquetaIva(cfg)}${p.multiplo > 1 ? ` · x${p.multiplo}` : ''}</small></div><button class="btn btn-agregar" type="button" data-agregar-barra>Agregar al pedido</button></div>` : ''}
+<div class="visor" data-visor hidden><button type="button" class="visor-cerrar" data-visor-cerrar aria-label="Cerrar">${ICON.cerrar}</button><img alt="${esc(p.nombre)}"></div>`,
   });
 }
 
@@ -200,6 +272,9 @@ function mayoristas(cfg, fuente) {
     ${d ? `<div><b>${d.porcentaje}% OFF</b><span>En compras desde ${pesos(d.desde)}</span></div>` : ''}
     <div><b>Todo el país</b><span>Envíos</span></div>
   </div>
+  ${cfg.compra?.infoPagos ? `<h2 id="pagos">Formas de pago</h2><p>${esc(cfg.compra.infoPagos)}</p>` : ''}
+  ${cfg.compra?.despacho ? `<h2 id="envios">Envíos</h2><p>${esc(cfg.compra.envios || '')}. ${esc(cfg.compra.despacho)}</p>` : ''}
+  ${cfg.compra?.textoTerminos ? `<h2 id="terminos">Términos y condiciones</h2><p>${esc(cfg.compra.textoTerminos)}</p>` : ''}
   <a class="btn" href="/catalogo">Ver el catálogo</a></div>`,
   });
 }

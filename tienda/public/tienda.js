@@ -106,7 +106,17 @@
     const c1 = $('[data-cont="pedido"]'), c2 = $('[data-cont="favoritos"]');
     c1.textContent = c1.dataset.n = pedido.length; c2.textContent = c2.dataset.n = favoritos.length;
     $$('[data-fav]').forEach((b) => b.classList.toggle('activo', esFav(Number(b.dataset.fav))));
-    pintarPedido(); pintarFavoritos();
+    $$('[data-fav-txt]').forEach((t) => { t.textContent = esFav(Number(t.closest('[data-fav]').dataset.fav)) ? 'En tu lista de deseos' : 'Agregar a la lista de deseos'; });
+    pintarPedido(); pintarFavoritos(); pintarMeta();
+  }
+
+  // Meta de compra inicial en la ficha de producto
+  function pintarMeta() {
+    const m = $('[data-meta-minimo]'); if (!m) return;
+    const min = Number(m.dataset.metaMinimo); const sub = subtotal(); const falta = Math.max(0, min - sub);
+    $('[data-meta-barra]', m).style.width = Math.min(100, sub / min * 100) + '%';
+    $('[data-meta-texto]', m).textContent = falta ? `Faltan ${pesos(falta)} para alcanzar el mínimo.` : '¡Alcanzaste el mínimo de compra inicial!';
+    m.classList.toggle('lograda', !falta);
   }
 
   // ---------- Eventos ----------
@@ -158,7 +168,61 @@
     }
   });
 
-  $$('[data-ver]').forEach((m) => m.addEventListener('click', () => { $('.ficha-img').src = m.src; }));
+  // ---------- Ficha de producto ----------
+  const galeria = $('[data-galeria]');
+  if (galeria) {
+    const imgs = JSON.parse($('[data-imagenes]', galeria).textContent);
+    const principal = $('.galeria-principal', galeria), foto = $('.ficha-img', galeria);
+    let actual = 0;
+    const ver = (i) => {
+      actual = (i + imgs.length) % imgs.length; foto.src = imgs[actual];
+      const c = $('[data-gal-actual]', galeria); if (c) c.textContent = actual + 1;
+      $$('[data-ver]', galeria).forEach((b, k) => b.classList.toggle('activa', k === actual));
+    };
+    galeria.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ver],[data-gal],[data-ampliar]');
+      if (b?.dataset.ver) return ver(Number(b.dataset.ver));
+      if (b?.dataset.gal) return ver(actual + Number(b.dataset.gal));
+      if (b?.hasAttribute('data-ampliar')) return abrirVisor();
+    });
+    // Zoom al pasar el mouse (solo con puntero fino)
+    if (matchMedia('(hover:hover) and (pointer:fine)').matches) {
+      principal.addEventListener('mousemove', (e) => {
+        if (e.target.closest('button')) { principal.classList.remove('zoom'); return; }
+        const r = principal.getBoundingClientRect();
+        foto.style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`;
+        principal.classList.add('zoom');
+      });
+      principal.addEventListener('mouseleave', () => principal.classList.remove('zoom'));
+    }
+    principal.addEventListener('click', (e) => { if (!e.target.closest('button')) abrirVisor(); });
+    const visor = $('[data-visor]');
+    function abrirVisor() { $('img', visor).src = imgs[actual]; visor.hidden = false; }
+    visor.addEventListener('click', (e) => { if (e.target === visor || e.target.closest('[data-visor-cerrar]')) visor.hidden = true; });
+    document.addEventListener('keydown', (e) => {
+      if (visor.hidden) return;
+      if (e.key === 'Escape') visor.hidden = true;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { ver(actual + (e.key === 'ArrowRight' ? 1 : -1)); $('img', visor).src = imgs[actual]; }
+    });
+
+    // Barra fija en celulares: usa la cantidad elegida en la ficha
+    const barra = $('[data-agregar-barra]');
+    if (barra) barra.addEventListener('click', () => $('.ficha [data-agregar]').click());
+
+    // Vistos recientemente
+    const prod = JSON.parse($('.ficha').dataset.prod);
+    let vistos = leer('vistos').filter((v) => v.id !== prod.id);
+    if (vistos.length) {
+      $('[data-vistos-lista]').innerHTML = vistos.slice(0, 6).map((v) => `<a class="mini" href="/p/${esc(v.slug)}"><img src="${esc(v.imagen)}" alt="" loading="lazy">${esc(v.nombre)}<small>${esc(v.sku)}</small></a>`).join('');
+      $('[data-vistos]').hidden = false;
+    }
+    guardar('vistos', [prod, ...vistos].slice(0, 12));
+  }
+
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-copiar]'); if (!b) return;
+    try { await navigator.clipboard.writeText(b.dataset.copiar); aviso('Enlace copiado'); } catch { aviso(b.dataset.copiar); }
+  });
 
   pintar();
 })();

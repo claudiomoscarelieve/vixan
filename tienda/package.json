@@ -1,6 +1,6 @@
 {
   "name": "vixan-tienda",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vixan Tienda — vidriera de e-commerce de cada cliente, conectada a Vixan",
   "main": "server.js",
   "scripts": {

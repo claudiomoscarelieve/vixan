@@ -12,6 +12,7 @@ const fuente = crearFuente(cfg);
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', 'loopback'); // detrás de Caddy
 app.use((_req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); next(); });
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
 
@@ -30,7 +31,8 @@ app.get('/c/:cat/:sub?', (req, res) => {
 app.get('/p/:slug', (req, res) => {
   const p = fuente.producto(req.params.slug);
   if (!p) return html(res, v.noEncontrado(cfg, fuente), 404);
-  html(res, v.producto(cfg, fuente, p));
+  const base = (cfg.tienda.url || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  html(res, v.producto(cfg, fuente, p, `${base}/p/${p.slug}`));
 });
 
 app.get('/buscar', (req, res) => {

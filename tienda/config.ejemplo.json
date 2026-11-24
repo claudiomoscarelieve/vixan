@@ -10,10 +10,12 @@
 
   "tienda": {
     "nombre": "Tu Marca",
+    "url": "https://www.tumarca.com.ar",
     "logo": "",
     "eslogan": "Bazar, deco y textil para tu negocio",
     "etiquetaCarrito": "Mayorista",
     "precioConIva": false,
+    "preciosSoloClientes": false,
     "compraMinimaInicial": 500000,
     "descuentoPorVolumen": { "desde": 1000000, "porcentaje": 10 }
   },
@@ -54,6 +56,20 @@
       "banner": { "titulo": "Novedades", "texto": "Mirá lo último que llegó", "enlace": "/novedades", "imagen": "" }
     }
   ],
+
+  "compra": {
+    "modalidad": "Venta mayorista",
+    "modalidadDetalle": "Venta exclusiva a comercios y revendedores mayoristas",
+    "disponibilidad": "Disponibilidad mayorista inmediata",
+    "avisoPocasUnidades": 10,
+    "pagos": "Pago con Mercado Pago o transferencia",
+    "infoPagos": "Aceptamos Mercado Pago (tarjetas y dinero en cuenta) y transferencia bancaria. Los datos para transferir se envían al confirmar el pedido.",
+    "envios": "Envíos a todo el país",
+    "despacho": "Despachamos a los 10 días de acreditado el pago; el costo del envío se coordina con la tienda.",
+    "devolucion": "Garantía de devolución de 30 días",
+    "terminos": "/mayoristas#terminos",
+    "textoTerminos": "Los cambios y devoluciones se aceptan dentro de los 30 días de recibida la mercadería, en su embalaje original. Los precios pueden cambiar sin previo aviso."
+  },
 
   "contacto": {
     "whatsapp": "5493564000000",

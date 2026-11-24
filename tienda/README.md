@@ -2,7 +2,7 @@
 
 Vidriera de e-commerce de cada cliente de Vixan. Se instala en el **servidor propio del cliente** y toma catálogo, precios y stock de Vixan (servidor central multicliente).
 
-> Versión 0.1.0: plantilla base con catálogo de ejemplo. La conexión con la API de Vixan, el checkout con Mercado Pago y las cuentas de clientes llegan en las próximas etapas.
+> Versión 0.2.0: plantilla base con catálogo de ejemplo. La conexión con la API de Vixan, el checkout con Mercado Pago y las cuentas de clientes llegan en las próximas etapas.
 
 ## Probarla
 
@@ -18,11 +18,12 @@ Copiá `config.ejemplo.json` como `config.json` (no se sube al repositorio porqu
 
 | Sección | Qué define |
 |---|---|
-| `tienda` | Nombre, logo (URL de imagen), eslogan, etiqueta del carrito, si los precios incluyen IVA, compra mínima inicial y descuento por volumen |
+| `tienda` | Nombre, URL pública, logo (URL de imagen), eslogan, etiqueta del carrito, si los precios incluyen IVA, si se ocultan a visitantes (`preciosSoloClientes`), compra mínima inicial y descuento por volumen |
 | `tema` | Colores (primario, acento, fondos, texto), tipografía y redondeo de bordes |
 | `avisos` | Mensajes de la barra superior que se desplaza |
 | `banners` | Los dos banners de la home (título, texto, enlace e imagen opcional) |
 | `bloquesOfertas` | Bloques de productos de la home con su banner de campaña |
+| `compra` | Textos de la ficha de producto: modalidad, disponibilidad, aviso de últimas unidades, pagos, envíos y despacho, devolución y términos |
 | `contacto` | WhatsApp (solo números, con código de país), mensaje inicial, email, dirección y horario |
 | `paginas.mayoristas` | Texto de la página "Cómo comprar" |
 | `fuente` / `vixan` | `demo` por ahora; `vixan` con la URL y la clave cuando exista la API pública |
@@ -33,7 +34,7 @@ Copiá `config.ejemplo.json` como `config.json` (no se sube al repositorio porqu
 - **Cabecera**: menú de categorías y buscador a la izquierda, logo al centro, ingreso, favoritos y carrito a la derecha.
 - **Barra de categorías** con Ofertas y Mayoristas.
 - **Home**: dos banners, una sección por categoría con la grilla de subcategorías, dos bloques de productos con banner de campaña, bloque de marca y pie en tres columnas.
-- **Páginas**: categoría y subcategoría con orden, ficha de producto con venta por bulto, búsqueda, ofertas, novedades, lo más pedido, catálogo completo, mayoristas y cuenta.
+- **Páginas**: categoría y subcategoría con orden, ficha de producto (galería con zoom, precio por unidad y bulto, meta de compra inicial, pago y envío, compartir, características, relacionados y vistos recientemente), búsqueda, ofertas, novedades, lo más pedido, catálogo completo, mayoristas y cuenta.
 - **Paneles**: "Mi pedido" con aviso de compra mínima, descuento por volumen e IVA, y envío del pedido por WhatsApp; "Mis favoritos"; botón flotante de WhatsApp.
 
 ## Archivos

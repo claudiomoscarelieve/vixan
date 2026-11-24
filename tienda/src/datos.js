@@ -14,6 +14,8 @@ const ARBOL = {
   'Iluminación': ['Velas LED', 'Guirnaldas', 'Faroles'],
   'Organización': ['Cajas', 'Percheros', 'Ganchos', 'Organizadores'],
 };
+const MATERIALES = ['Vidrio', 'Cerámica', 'Acero inoxidable', 'Madera', 'Algodón', 'Lino', 'Metal', 'Fibra natural'];
+const COLORES = ['Blanco', 'Natural', 'Negro', 'Bronce', 'Verde salvia', 'Terracota', 'Gris'];
 const ADJ = ['Clásico', 'Nórdico', 'Rústico', 'Liso', 'Texturado', 'Natural', 'Mini', 'Grande', 'Línea Blanca', 'Bicolor'];
 
 function generarDemo() {
@@ -42,8 +44,14 @@ function generarDemo() {
           multiplo: [1, 3, 6, 12][n % 4],
           nuevo: n % 9 === 1,
           masPedido: n % 5 === 2,
-          imagenes: [],
-          descripcion: `${nombre} de la categoría ${cat}. Producto de ejemplo: la descripción real llega desde el catálogo de Vixan.`,
+          imagenes: (n % 3 ? [1, 2, 3] : [1]).map((k) => `/ph/${encodeURIComponent(k === 1 ? nombre : `${nombre} ${k}`)}.svg`),
+          descripcion: `${nombre} seleccionado de nuestro catálogo mayorista, ideal para decoración, bazar y uso comercial. Producto de ejemplo: la descripción real llega desde el catálogo de Vixan.`,
+          caracteristicas: [
+            ['Material', MATERIALES[n % MATERIALES.length]],
+            ['Color', COLORES[(n * 3) % COLORES.length]],
+            ['Medidas', `${8 + (n % 20)} × ${6 + (n % 12)} cm`],
+            ['Peso', `${120 + (n * 17) % 800} g`],
+          ],
         });
       }
     }

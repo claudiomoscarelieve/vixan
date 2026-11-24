@@ -4,6 +4,16 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## Vixan Tienda 0.2.0 — 24/11/2026
+**Página de producto** completa:
+- Galería con contador, flechas, miniaturas, zoom al pasar el mouse y visor a pantalla completa.
+- Código y modalidad, precio por unidad y por bulto, venta en múltiplos, stock con aviso de últimas unidades.
+- Meta de compra inicial que avanza con el pedido y aviso de descuento por volumen.
+- "Lo que tenés que saber", pago, envío, garantía y términos (textos editables en `config.json` → `compra`).
+- Compartir en Facebook, X, LinkedIn, WhatsApp, Pinterest, email y copiar enlace.
+- Descripción, tabla de características, ayuda por WhatsApp, productos relacionados y vistos recientemente.
+- Opción `preciosSoloClientes` para ocultar precios a visitantes, barra fija de compra en celulares y datos para Google (schema.org).
+
 ## Vixan Tienda 0.1.0 — 24/11/2026
 Primera versión de **Vixan Tienda** (carpeta `tienda/`), la vidriera que se instala en el servidor de cada cliente:
 - Plantilla base con estilo neutro de Vixan, personalizable por cliente desde `config.json` (logo, colores, tipografía, avisos, banners, contacto, condiciones mayoristas).
