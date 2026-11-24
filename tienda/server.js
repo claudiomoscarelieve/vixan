@@ -8,8 +8,8 @@ const v = require('./src/vistas');
 
 const { cargarConfig } = require('./src/config');
 const cfg = cargarConfig();
-const fuente = crearFuente(cfg);
 
+let fuente;
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback'); // detrás de Caddy
@@ -61,4 +61,11 @@ app.get('/ph/:texto.svg', (req, res) => {
 app.use((_req, res) => html(res, v.noEncontrado(cfg, fuente), 404));
 
 const PORT = Number(process.env.PORT || cfg.puerto || 3100);
-app.listen(PORT, process.env.HOST || '127.0.0.1', () => console.log(`Vixan Tienda (${cfg.tienda.nombre}) en http://localhost:${PORT}`));
+(async () => {
+  fuente = await crearFuente(cfg);
+  // Con Vixan como fuente, el catálogo se vuelve a pedir cada 5 minutos (precios y stock al día)
+  if (fuente.origen === 'vixan') {
+    setInterval(() => fuente.recargar().catch((e) => console.error('[tienda]', e.message)), 5 * 60000).unref();
+  }
+  app.listen(PORT, process.env.HOST || '127.0.0.1', () => console.log(`Vixan Tienda (${cfg.tienda.nombre}, catálogo ${fuente.origen}) en http://localhost:${PORT}`));
+})().catch((e) => { console.error(`[tienda] ${e.message}`); process.exit(1); });

@@ -120,10 +120,15 @@ function inicio(cfg, fuente) {
   const banners = (cfg.banners || []).map((b, i) => banner(b, `b${i}`)).join('');
   const secciones = cats.map((c) => `<section class="seccion envoltura">
   <div class="seccion-cab"><div><h2>${esc(c.nombre)}</h2><p>Detalles para tu negocio</p></div><a class="ver-todo" href="/c/${c.slug}">Ver toda la colección ${ICON.flecha}</a></div>
-  <div class="mosaicos">${c.subcategorias.map((s) => `<a class="mosaico" href="/c/${c.slug}/${s.slug}"><img src="${esc(imgSub(s))}" alt="" loading="lazy"><span>${esc(s.nombre)}</span></a>`).join('')}</div>
+  ${c.subcategorias.length
+    ? `<div class="mosaicos">${c.subcategorias.map((s) => `<a class="mosaico" href="/c/${c.slug}/${s.slug}"><img src="${esc(imgSub(s))}" alt="" loading="lazy"><span>${esc(s.nombre)}</span></a>`).join('')}</div>`
+    : grilla(fuente.productos({ categoria: c.slug, limite: 8 }), cfg)}
 </section>`).join('');
   const ofertas = (cfg.bloquesOfertas || []).map((b, i) => {
-    const lista = fuente.productos({ categoria: b.categoria || undefined, ofertas: i === 0, masPedidos: i === 1, limite: 4 });
+    let lista = fuente.productos({ categoria: b.categoria || undefined, ofertas: i === 0, masPedidos: i === 1, limite: 4 });
+    if (!lista.length) lista = fuente.productos({ categoria: b.categoria || undefined, nuevos: i === 0 }).slice(0, 4);
+    if (!lista.length) lista = fuente.productos({ categoria: b.categoria || undefined }).slice(i * 4, i * 4 + 4);
+    if (!lista.length) return '';
     return `<section class="seccion envoltura bloque-ofertas${i % 2 ? ' invertido' : ''}">
   ${b.banner ? banner(b.banner, 'banner-alto') : ''}
   <div><div class="seccion-cab"><div><h2>${esc(b.titulo)}</h2>${b.texto ? `<p>${esc(b.texto)}</p>` : ''}</div><a class="ver-todo" href="${i === 0 ? '/ofertas' : '/mas-pedidos'}">Ver más ${ICON.flecha}</a></div>${grilla(lista, cfg)}</div>
@@ -152,7 +157,7 @@ function listado(cfg, fuente, { titulo, bajada, items, filtros, actual, q, busca
 }
 
 function categoria(cfg, fuente, cat, sub, orden) {
-  const chips = `<div class="chips"><a href="/c/${cat.slug}"${sub ? '' : ' class="activo"'}>Todo</a>${cat.subcategorias.map((s) => `<a href="/c/${cat.slug}/${s.slug}"${sub?.slug === s.slug ? ' class="activo"' : ''}>${esc(s.nombre)}</a>`).join('')}</div>`;
+  const chips = cat.subcategorias.length ? `<div class="chips"><a href="/c/${cat.slug}"${sub ? '' : ' class="activo"'}>Todo</a>${cat.subcategorias.map((s) => `<a href="/c/${cat.slug}/${s.slug}"${sub?.slug === s.slug ? ' class="activo"' : ''}>${esc(s.nombre)}</a>`).join('')}</div>` : '';
   return listado(cfg, fuente, {
     titulo: sub ? sub.nombre : cat.nombre,
     bajada: chips,
@@ -167,7 +172,7 @@ function producto(cfg, fuente, p, urlAbsoluta = '') {
   const compra = cfg.compra || {};
   const cat = fuente.categoria(p.categoria);
   const sub = cat?.subcategorias.find((s) => s.slug === p.subcategoria);
-  const relacionados = fuente.productos({ subcategoria: p.subcategoria }).filter((x) => x.id !== p.id).slice(0, 4);
+  const relacionados = fuente.productos(p.subcategoria ? { subcategoria: p.subcategoria, categoria: p.categoria } : { categoria: p.categoria }).filter((x) => x.id !== p.id).slice(0, 4);
   const imgs = p.imagenes?.length ? p.imagenes : [img(p)];
   const datos = esc(JSON.stringify({ id: p.id, nombre: p.nombre, sku: p.sku, precio: p.precio, multiplo: p.multiplo, imagen: img(p), slug: p.slug }));
   const wa = cfg.contacto?.whatsapp;

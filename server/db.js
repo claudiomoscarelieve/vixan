@@ -69,6 +69,11 @@ CREATE TABLE IF NOT EXISTS event_log (
 );
 `);
 
+// Alcance de las claves de API: "completa" (toda la API del cliente) o "tienda" (solo leer el catálogo para Vixan Tienda)
+if (!db.prepare('PRAGMA table_info(api_keys)').all().some((c) => c.name === 'alcance')) {
+  db.exec("ALTER TABLE api_keys ADD COLUMN alcance TEXT DEFAULT 'completa'");
+}
+
 // ── Contraseñas: scrypt con sal ──
 function hashPassword(pw) {
   const salt = crypto.randomBytes(16).toString('hex');

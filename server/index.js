@@ -8,6 +8,7 @@ const { integrar } = require('./integrations');
 const woo = require('./woo');
 const catalogo = require('./catalogo');
 const arca = require('./arca');
+const tienda = require('./tienda');
 const { facturaHTML } = require('./factura-html');
 const STOCK_ENTITIES = new Set(['lotes', 'pedidos', 'productos']);
 // Avisa al sincronizador de WooCommerce cuando algo pudo cambiar el stock
@@ -48,7 +49,16 @@ function auth(req, res, next) {
   const key = req.headers['x-api-key'];
   if (key) {
     const k = store.db.prepare('SELECT * FROM api_keys WHERE key_hash=?').get(store.sha256(String(key)));
-    if (k) { req.user = { id: null, rol: 'api', nombre: 'API: ' + k.nombre }; req.tenantId = k.tenant_id; return next(); }
+    if (k) {
+      // Las claves de Vixan Tienda solo pueden leer el catálogo de la tienda
+      if (k.alcance === 'tienda' && !(req.method === 'GET' && req.path.startsWith('/v1/tienda/'))) {
+        return res.status(403).json({ ok: false, error: 'Esta clave solo sirve para Vixan Tienda' });
+      }
+      if (k.alcance !== 'tienda' && !store.db.prepare('SELECT activo FROM tenants WHERE id=?').get(k.tenant_id)?.activo) {
+        return res.status(403).json({ ok: false, error: 'La cuenta está suspendida' });
+      }
+      req.user = { id: null, rol: 'api', nombre: 'API: ' + k.nombre }; req.tenantId = k.tenant_id; return next();
+    }
   }
   res.status(401).json({ ok: false, error: 'No autenticado' });
 }
@@ -128,6 +138,9 @@ app.post('/api/auth/switch-tenant', onlyRoles('superadmin'), wrap((req) => {
 }));
 
 app.use('/api/catalogo', catalogo.router);
+// Vixan Tienda: catálogo para la tienda (clave de alcance "tienda") y panel de conexión
+app.use('/api/v1/tienda', (req, res, next) => (store.db.prepare('SELECT activo FROM tenants WHERE id=?').get(req.tenantId)?.activo ? next() : res.status(403).json({ ok: false, error: 'La cuenta está suspendida' })), tienda.publicRouter);
+app.use('/api/tienda', tienda.router);
 
 // ───────────── CRUD genérico ─────────────
 function checkEntity(req, res, next) {

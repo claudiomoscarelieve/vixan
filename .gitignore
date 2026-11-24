@@ -7,3 +7,5 @@ data/
 .DS_Store
 tienda/config.json
 tienda/dist/
+tienda/clientes/*/.catalogo-vixan.json
+tienda/.catalogo-vixan.json

@@ -1,6 +1,9 @@
 // Fuente de datos de la tienda.
-// Hoy: "demo" (catálogo de ejemplo). Más adelante: "vixan" (API pública /api/v1 de Vixan con la clave del cliente).
+// "demo": catálogo de ejemplo. "vixan": catálogo publicado del cliente, desde /api/v1/tienda/catalogo con la clave de la tienda.
 // Las vistas solo usan las funciones exportadas, así que cambiar de fuente no toca la plantilla.
+
+const fs = require('fs');
+const path = require('path');
 
 const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -60,17 +63,55 @@ function generarDemo() {
   return { categorias, productos };
 }
 
-// ---------- Fuente ----------
-let cache = null;
-
-function crearFuente(config) {
-  if (config.fuente === 'vixan') {
-    // Etapa 1 del plan: la API pública de Vixan todavía no existe.
-    // Cuando esté, acá se pide /api/v1/catalogo con la clave y se guarda en caché local.
-    console.warn('[tienda] fuente "vixan" todavía no disponible; se usa el catálogo de ejemplo.');
+// ---------- Catálogo desde Vixan ----------
+// Pide /api/v1/tienda/catalogo con la clave de la tienda. Guarda una copia local: si Vixan no responde,
+// la tienda sigue mostrando el último catálogo que recibió.
+async function leerDeVixan(config) {
+  const url = String(config.vixan?.url || '').replace(/\/$/, '');
+  const clave = process.env.VIXAN_TIENDA_CLAVE || config.vixan?.clave;
+  if (!url || !clave) throw new Error('Falta la conexión con Vixan: config.json → vixan.url y la clave en VIXAN_TIENDA_CLAVE.');
+  const copia = config._archivo ? path.join(path.dirname(config._archivo), '.catalogo-vixan.json') : null;
+  try {
+    const r = await fetch(`${url}/api/v1/tienda/catalogo`, { headers: { 'X-Api-Key': clave, Accept: 'application/json' }, signal: AbortSignal.timeout(30000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || `Vixan respondió ${r.status}`);
+    if (copia) { try { fs.writeFileSync(copia, JSON.stringify(j.data)); } catch { /* sin permiso de escritura: se sigue igual */ } }
+    return j.data;
+  } catch (e) {
+    if (copia && fs.existsSync(copia)) {
+      console.warn(`[tienda] No se pudo leer el catálogo de Vixan (${e.message}). Se usa la última copia guardada.`);
+      return JSON.parse(fs.readFileSync(copia, 'utf8'));
+    }
+    throw new Error(`No se pudo leer el catálogo de Vixan: ${e.message}`);
   }
-  cache = generarDemo();
+}
+
+// Arma categorías y subcategorías a partir de los productos que manda Vixan
+function desdeVixan(data) {
+  const cats = new Map();
+  const productos = (data.productos || []).map((p) => {
+    const catNombre = String(p.categoria || '').trim() || 'Otros';
+    const subNombre = String(p.subcategoria || '').trim();
+    const cs = slug(catNombre) || 'otros';
+    if (!cats.has(cs)) cats.set(cs, { nombre: catNombre, slug: cs, subcategorias: new Map() });
+    let ss = null;
+    if (subNombre) { ss = slug(subNombre); const c = cats.get(cs); if (!c.subcategorias.has(ss)) c.subcategorias.set(ss, { nombre: subNombre, slug: ss, categoria: cs }); }
+    return {
+      ...p, categoria: cs, subcategoria: ss, imagenes: p.imagenes || [], caracteristicas: p.caracteristicas || [],
+      multiplo: Math.max(1, Number(p.multiplo) || 1), precioAnterior: p.precioAnterior || null, masPedido: !!p.destacado,
+    };
+  });
+  const orden = (a, b) => a.nombre.localeCompare(b.nombre, 'es');
+  const categorias = [...cats.values()].map((c) => ({ ...c, subcategorias: [...c.subcategorias.values()].sort(orden) })).sort(orden);
+  return { categorias, productos };
+}
+
+// ---------- Fuente ----------
+async function crearFuente(config) {
+  let cache = config.fuente === 'vixan' ? desdeVixan(await leerDeVixan(config)) : generarDemo();
   return {
+    origen: config.fuente === 'vixan' ? 'vixan' : 'demo',
+    async recargar() { if (config.fuente === 'vixan') cache = desdeVixan(await leerDeVixan(config)); },
     categorias: () => cache.categorias,
     categoria: (s) => cache.categorias.find((c) => c.slug === s) || null,
     producto: (s) => cache.productos.find((p) => p.slug === s) || null,

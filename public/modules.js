@@ -502,14 +502,48 @@ async function renderApi(el) {
   VG.crud(el.querySelector('[data-e]'), { load: () => VG.get('/api/eventos'), canCreate: false, canEdit: false, canDelete: false, columns: [{ k: 'created_at', label: 'Fecha', fmt: datetime }, { k: 'tipo', label: 'Evento' }, { k: 'detalle', label: 'Detalle' }] });
 }
 
-// ═════════════ Tienda online ═════════════
-const tiendaConfig = settingsForm('tienda', [
-  { k: 'abierta', label: 'Tienda abierta al público', type: 'checkbox', full: true }, { k: 'nombre', label: 'Nombre de la tienda' }, { k: 'slug', label: 'Link (tutienda)', placeholder: 'insumos-demo' },
-  { k: 'lista', label: 'Lista de precios', type: 'select', options: ['Minorista', 'Mayorista', 'Gastronomía'] }, { k: 'dominio', label: 'Dominio propio', placeholder: 'tienda.midominio.com.ar' },
-  { k: 'color', label: 'Color principal', type: 'color', default: '#1FB1A4' }, { k: 'envio', label: 'Costo de envío fijo ($)', type: 'number' },
-  { k: 'pago_mp', label: 'Acepta Mercado Pago', type: 'checkbox' }, { k: 'pago_transf', label: 'Acepta transferencia (−5%)', type: 'checkbox' },
-  { k: 'ocultos', label: 'SKUs ocultos', type: 'textarea', full: true, placeholder: 'VG-1001, VG-1002' },
-], 'Tu vidriera pública de venta directa: nombre y link propio, lista de precios y productos visibles. Los pedidos entran solos al sistema como venta "Vixan Market".');
+// ═════════════ Tienda online (Vixan Market / Vixan Tienda) ═════════════
+async function tiendaConfig(el) {
+  const [s, est] = await Promise.all([getSettings(), VG.get('/api/tienda/estado')]);
+  const cfgT = s.tienda || {};
+  const fields = [
+    { k: 'nombre', label: 'Nombre de la tienda' },
+    { k: 'lista', label: 'Lista de precios de la tienda', type: 'select', options: est.listas.map((l) => [String(l.id), l.nombre]) },
+    { k: 'dominio', label: 'Dirección de la tienda', placeholder: 'https://tutiendaconia.com.ar' },
+    { k: 'ocultos', label: 'SKUs que no se muestran en la tienda', type: 'textarea', full: true, placeholder: 'VG-1001, VG-1002' },
+  ];
+  const valorLista = est.listas.find((l) => String(l.id) === String(cfgT.lista) || l.nombre === cfgT.lista)?.id ?? 'general';
+  const cuando = (f) => (f ? datetime(f) : 'nunca');
+  el.innerHTML = `<div class="note">Tu tienda online muestra los productos marcados con <b>Publicar en la tienda</b> en el catálogo, con el precio de la lista que elijas acá y el stock disponible. Los productos sin precio en esa lista no se muestran.</div>
+  <div class="grid g4" style="margin-bottom:14px">${VG.kpi({ label: 'Productos en la tienda', value: est.publicados, tone: 'teal' })}${VG.kpi({ label: 'Marcados para publicar', value: est.marcados })}${VG.kpi({ label: 'Lista de precios', value: esc(est.lista) })}${VG.kpi({ label: 'Última conexión de la tienda', value: est.conexion ? datetime(est.conexion.ultima) : 'nunca', tone: est.conexion ? 'ok' : 'warn' })}</div>
+  <div class="grid g2"><div class="card" data-cfg><h3>Datos de la tienda</h3></div>
+  <div class="card"><h3>🔗 Conexión con Vixan Tienda</h3>
+    <p class="muted">La tienda se conecta a Vixan con una <b>clave de tienda</b>: solo puede leer el catálogo publicado, no ve pedidos, clientes ni nada más de tu cuenta.</p>
+    <div style="margin:8px 0">Estado: ${est.clave ? badge(`Clave ${est.clave.prefijo}… creada el ${date(est.clave.created_at)}`, 'ok') : badge('Sin clave', 'err')}</div>
+    <div class="small muted">Última vez que la tienda leyó el catálogo: <b>${cuando(est.conexion?.ultima)}</b></div>
+    <div class="small" style="margin:10px 0 4px">Dirección de Vixan para la configuración de la tienda:</div><code class="k">${esc(est.urlApi)}</code>
+    <div class="toolbar" style="margin-top:12px"><button class="btn primary" data-clave>${est.clave ? 'Generar clave nueva' : 'Generar clave de la tienda'}</button>${est.clave ? '<button class="btn" data-revocar>Desconectar</button>' : ''}<button class="btn" data-ver>Ver qué publica</button></div>
+  </div></div>`;
+  const f = VG.form(fields, { ...cfgT, lista: String(valorLista) });
+  const box = el.querySelector('[data-cfg]'); box.appendChild(f);
+  const b = VG.h('<div class="toolbar" style="margin-top:12px"><button class="btn primary">Guardar</button></div>'); box.appendChild(b);
+  b.querySelector('button').onclick = async () => { try { await VG.put('/api/settings', { tienda: { ...cfgT, ...VG.readForm(f, fields) } }); settingsCache.v = null; VG.toast('Configuración de la tienda guardada'); tiendaConfig(el); } catch (e) { VG.toast(e.message, true); } };
+  el.querySelector('[data-clave]').onclick = async () => {
+    if (est.clave && !VG.confirm('La clave anterior deja de funcionar: vas a tener que cargar la nueva en la tienda. ¿Seguimos?')) return;
+    try {
+      const r = await VG.post('/api/tienda/clave');
+      VG.modal({ title: 'Clave de la tienda', body: `<p>Copiala ahora: no se vuelve a mostrar.</p><code class="k" style="font-size:14px;word-break:break-all">${esc(r.key)}</code><p class="small muted" style="margin-top:10px">En la tienda va en la variable <code class="k">VIXAN_TIENDA_CLAVE</code> (o en config.json → vixan → clave).</p>` });
+      tiendaConfig(el);
+    } catch (e) { VG.toast(e.message, true); }
+  };
+  el.querySelector('[data-revocar]')?.addEventListener('click', async () => { if (!VG.confirm('La tienda deja de recibir el catálogo. ¿Desconectar?')) return; await VG.del('/api/tienda/clave'); VG.toast('Tienda desconectada'); tiendaConfig(el); });
+  el.querySelector('[data-ver]').onclick = async () => {
+    const d = await VG.get('/api/tienda/vista-previa');
+    VG.modal({ title: `Lo que ve la tienda (${d.productos.length} productos)`, wide: true, body: d.productos.length
+      ? `<table class="t"><thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock</th><th class="num">Fotos</th></tr></thead><tbody>${d.productos.map((p) => `<tr><td><code class="k">${esc(p.sku)}</code></td><td>${esc(p.nombre)}</td><td>${esc([p.categoria, p.subcategoria].filter(Boolean).join(' › ') || '—')}</td><td class="num">${money(p.precio)}</td><td class="num">${VG.n(p.stock)}</td><td class="num">${p.imagenes.length}</td></tr>`).join('')}</tbody></table>`
+      : '<p>Todavía no hay productos para la tienda. En Catálogo, editá cada producto y marcá <b>Publicar en la tienda</b>; tiene que tener precio en la lista elegida.</p>' });
+  };
+}
 
 // ═════════════ WhatsApp ═════════════
 async function renderWhatsapp(el) {

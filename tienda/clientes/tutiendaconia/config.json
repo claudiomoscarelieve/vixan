@@ -1,6 +1,6 @@
 {
   "puerto": 3100,
-  "fuente": "demo",
+  "fuente": "vixan",
   "vixan": {
     "url": "https://app.vixan.com.ar"
   },
@@ -104,6 +104,6 @@
   "paginas": {
     "mayoristas": "Vendemos exclusivamente por mayor. La primera compra tiene un mínimo; después podés reponer sin mínimo. Los precios no incluyen IVA."
   },
-  "_ayuda": "Tienda de demostración de Vixan Tienda en tutiendaconia.com.ar (hosting compartido DonWeb/Ferozo). Publicar: node publicar.js --config clientes/tutiendaconia/config.json",
+  "_ayuda": "Tienda de tutiendaconia.com.ar (hosting compartido DonWeb/Ferozo). Publicar con VIXAN_TIENDA_CLAVE y VIXAN_FTP_CLAVE: node publicar.js --config clientes/tutiendaconia/config.json",
   "recursos": "recursos"
 }

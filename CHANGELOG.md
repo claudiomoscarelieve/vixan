@@ -4,6 +4,15 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## 1.5.0 + Vixan Tienda 0.4.0 — 24/11/2026
+**Conexión de Vixan con Vixan Tienda**:
+- **Clave de tienda**: se genera en **Vixan Market → Mi tienda** y solo puede leer el catálogo publicado (no ve pedidos, clientes ni el resto de la cuenta). Generar una nueva o desconectar anula la anterior.
+- **Mi tienda**: lista de precios real (general o cualquiera de tus listas), dirección de la tienda, SKUs ocultos, cantidad de productos publicados, última conexión y "Ver qué publica".
+- **Ficha de producto**: "Publicar en la tienda" (antes "Publicar en Vixan Market"), subcategoría, venta por bulto, precio anterior, novedad, descripción y fotos.
+- Catálogo para la tienda en `GET /api/v1/tienda/catalogo` con precio de la lista elegida, stock disponible (combos, cajas y fraccionados calculados) y características.
+- Las claves de API de una cuenta suspendida dejan de funcionar.
+- **Vixan Tienda** lee el catálogo de Vixan (`"fuente": "vixan"`, clave en `VIXAN_TIENDA_CLAVE`), guarda una copia por si Vixan no responde, y en servidor con Node lo vuelve a leer cada 5 minutos. Categorías sin subcategorías muestran sus productos en la home.
+
 ## Vixan Tienda 0.3.1 — 24/11/2026
 - Configuración por cliente en `tienda/clientes/<cliente>/` (`--config` en server, exportar y publicar) con carpeta de recursos propia (logo, favicon, banners).
 - Favicon, ícono para celulares y color del navegador configurables.

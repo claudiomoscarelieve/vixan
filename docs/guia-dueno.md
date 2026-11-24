@@ -112,6 +112,27 @@ Los clientes se crean desde el **Panel Vixan**, que solo ve el superadmin. Cada 
 - **Entrar**: abre la cuenta de ese cliente para revisar o darle soporte. También podés cambiar de cliente con el selector de arriba a la derecha.
 - **Suspender**: le corta el acceso sin borrar sus datos. **Reactivar** lo devuelve.
 
+## Conectar la tienda de un cliente (Vixan Tienda)
+
+Vixan Tienda es la tienda online de cada cliente (carpeta `tienda/` del repositorio). Muestra los productos que el cliente marca para publicar, con su precio y stock de Vixan.
+
+1. Entrá a la cuenta del cliente (Panel Vixan → **Entrar**).
+2. En **Catálogo**, editá los productos que van a la tienda y marcá **Publicar en la tienda**. Ahí mismo se cargan la subcategoría, la venta por bulto, la descripción y las fotos (una dirección https por línea).
+3. En **Vixan Market → Mi tienda**, elegí la **lista de precios** de la tienda y tocá **Generar clave de la tienda**. Copiá la clave: no se vuelve a mostrar.
+4. En la configuración de la tienda (`tienda/clientes/<cliente>/config.json`): `"fuente": "vixan"` y `"vixan": { "url": "https://app.vixan.com.ar" }`.
+5. Publicá con la clave en una variable (no se guarda en ningún archivo). Desde Windows, en **cmd**:
+
+```
+cd ruta\al\repositorio\vixan\tienda
+set VIXAN_TIENDA_CLAVE=vt_...
+set VIXAN_FTP_CLAVE=contraseña-del-ftp
+node publicar.js --config clientes/<cliente>/config.json
+```
+
+La clave de la tienda solo puede leer el catálogo publicado: no ve pedidos, clientes ni nada más de la cuenta. En **Mi tienda** se ve cuándo se conectó la tienda por última vez, y **Ver qué publica** muestra la lista exacta. **Generar clave nueva** o **Desconectar** dejan sin acceso a la clave anterior.
+
+Cada vez que cambian precios o stock hay que volver a publicar (el comando sube solo lo que cambió). La tienda en servidor con Node lee el catálogo sola cada 5 minutos.
+
 ## Copias de seguridad
 
 - El servidor guarda una copia diaria de la base en `/var/backups/vixan` (últimos 7 días) y otra antes de cada actualización.

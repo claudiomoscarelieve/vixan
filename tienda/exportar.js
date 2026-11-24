@@ -13,9 +13,9 @@ const v = require('./src/vistas');
 const { cargarConfig, archivosDe } = require('./src/config');
 
 
-function exportar(destino = path.join(__dirname, 'dist'), cfg = cargarConfig()) {
+async function exportar(destino = path.join(__dirname, 'dist'), cfg = cargarConfig()) {
   cfg = { ...cfg, _estatico: true };
-  const fuente = crearFuente(cfg);
+  const fuente = await crearFuente(cfg);
   const base = (cfg.tienda.url || '').replace(/\/$/, '');
   const archivos = new Map(); // ruta relativa → contenido
 
@@ -100,7 +100,7 @@ Options -Indexes
     fs.writeFileSync(abs, contenido);
     manifiesto[rel] = crypto.createHash('sha1').update(contenido).digest('hex');
   }
-  return { destino, manifiesto, paginas: [...archivos.keys()].filter((r) => r.endsWith('.html')).length, total: archivos.size };
+  return { destino, manifiesto, origen: fuente.origen, productos: fuente.productos().length, paginas: [...archivos.keys()].filter((r) => r.endsWith('.html')).length, total: archivos.size };
 }
 
 module.exports = { exportar, cargarConfig };
@@ -108,6 +108,6 @@ module.exports = { exportar, cargarConfig };
 if (require.main === module) {
   const args = process.argv.slice(2).filter((a, i, l) => a !== '--config' && l[i - 1] !== '--config');
   const destino = path.resolve(args[0] || path.join(__dirname, 'dist'));
-  const r = exportar(destino);
-  console.log(`Tienda exportada en ${r.destino}: ${r.paginas} páginas, ${r.total} archivos.`);
+  exportar(destino).then((r) => console.log(`Tienda exportada en ${r.destino}: ${r.paginas} páginas, ${r.total} archivos (catálogo ${r.origen}, ${r.productos} productos).`))
+    .catch((e) => { console.error(`Error: ${e.message}`); process.exit(1); });
 }

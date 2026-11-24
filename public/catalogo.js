@@ -40,7 +40,7 @@ function detalle(p, ctx) {
   const body = VG.h(`<div>
     <div class="muted small" style="margin-bottom:10px">SKU <code class="k">${esc(p.sku)}</code> · ${esc(TIPO_LABEL[p.tipo])}${p.ean ? ' · EAN ' + esc(p.ean) : ''}</div>
     <div class="grid g3">
-      <div class="card"><h3>Información general</h3>${lineas([['Fabricante', esc(p.fabricante || '—')], ['Marca', esc(p.marca || '—')], ['Categoría', esc(p.categoria || '—')], ['SKU del proveedor', esc(p.sku_proveedor || '—')], ['Peso', p.peso_kg ? VG.n(p.peso_kg) + ' kg' : '—'], ['Medidas', p.largo ? `${VG.n(p.largo)} × ${VG.n(p.ancho)} × ${VG.n(p.alto)} cm` : '—'], ['Publicado en Vixan Market', p.market ? 'Sí' : 'No']])}</div>
+      <div class="card"><h3>Información general</h3>${lineas([['Fabricante', esc(p.fabricante || '—')], ['Marca', esc(p.marca || '—')], ['Categoría', esc(p.categoria || '—')], ['SKU del proveedor', esc(p.sku_proveedor || '—')], ['Peso', p.peso_kg ? VG.n(p.peso_kg) + ' kg' : '—'], ['Medidas', p.largo ? `${VG.n(p.largo)} × ${VG.n(p.ancho)} × ${VG.n(p.alto)} cm` : '—'], ['Publicado en la tienda', p.market ? 'Sí' : 'No']])}</div>
       <div class="card"><h3>Stock y costos</h3>${lineas([['Stock disponible', VG.n(p.stock)], ['Stock mínimo', p.stock_minimo ? VG.n(p.stock_minimo) : '—'], ['Costo en dólares', p.costo_usd ? 'US$ ' + VG.n(p.costo_usd) : '—'], ['Costo proveedor', money(p.costo_base)], ['Costos internos', p.tipo === 'unidad' ? pct(p.costos_internos ?? C.data.config.costos_internos_general) : '—'], ['Costo final', money(p.costo_final)], ['Margen', p.margen == null ? '—' : pct(p.margen)]])}</div>
       <div class="card"><h3>Precios de venta</h3>${lineas(precios)}</div>
     </div>
@@ -70,7 +70,13 @@ const formProducto = (row) => [
   { k: 'peso_kg', label: 'Peso (kg)', type: 'number', step: '0.01' }, { k: 'largo', label: 'Largo (cm)', type: 'number', step: '0.1' },
   { k: 'ancho', label: 'Ancho (cm)', type: 'number', step: '0.1' }, { k: 'alto', label: 'Alto (cm)', type: 'number', step: '0.1' },
   { k: 'litros', label: 'Litros por unidad', type: 'number', step: '0.01' },
-  { k: 'market', label: 'Publicar en Vixan Market', type: 'checkbox' },
+  { k: 'market', label: 'Publicar en la tienda', type: 'checkbox' },
+  { k: 'subcategoria', label: 'Subcategoría en la tienda', placeholder: 'ej.: Vasos' },
+  { k: 'venta_multiplo', label: 'Se vende por bulto de (unidades)', type: 'number', placeholder: '1' },
+  { k: 'precio_anterior', label: 'Precio anterior (para mostrar oferta)', type: 'number', step: '0.01' },
+  { k: 'nuevo', label: 'Marcar como novedad', type: 'checkbox' },
+  { k: 'descripcion', label: 'Descripción para la tienda', type: 'textarea', full: true },
+  { k: 'imagenes', label: 'Fotos (una dirección https por línea)', type: 'textarea', full: true, placeholder: 'https://…/foto1.jpg' },
 ];
 function tabCatalogo(el) {
   VG.crud(el, {
@@ -83,7 +89,7 @@ function tabCatalogo(el) {
       { k: 'fabricante', label: 'Fabricante' }, { k: 'marca', label: 'Marca' }, { k: 'categoria', label: 'Categoría' },
       { k: 'precio_general', label: 'Precio', fmt: (v) => (v == null ? '<span class="muted">sin precio</span>' : money(v)), num: true },
       { k: 'stock', label: 'Stock', num: true, fmt: (v) => (v <= 0 ? badge(VG.n(v), 'err') : VG.n(v)) },
-      { k: 'market', label: 'Market', fmt: (v) => (v ? badge('En Market', 'ok') : '—') },
+      { k: 'market', label: 'Tienda', fmt: (v) => (v ? badge('En la tienda', 'ok') : '—') },
       { k: 'woo_id', label: 'Woo', fmt: (v) => (v ? '🟣' : '—') },
     ],
     rowActions: (r, ctx) => [{ label: 'Detalles', onClick: () => detalle(r, ctx) }],

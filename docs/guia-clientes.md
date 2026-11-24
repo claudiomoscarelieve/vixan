@@ -93,6 +93,15 @@ Porcentajes: 45 se escribe 45, no 0,45. Al lado de cada precio ves a qué markup
 
 **Fraccionados.** Para lo que comprás entero y vendés también por partes (una bolsa de 500 g que se vende en 250, 100 y 25 g). **+ Nuevo fraccionado**: elegís el producto entero, cuánto trae y la porción más chica; **Sugerir las habituales** arma las presentaciones (mitad, quinto, décimo…). Cada presentación es un producto con su SKU que podés publicar en la tienda. Su precio es la parte proporcional del entero más un **recargo** (vacío = el habitual: mitad +10 %, quinto +15 %, décimo +30 %, veinteavo +50 %). Al venderla se descuenta su parte del producto entero, así que el stock del entero puede quedar con decimales (por ejemplo 19,5 bolsas). Si una presentación ya existía como producto suelto con stock, ese stock pasa al entero.
 
+## Tu tienda online
+
+Si tenés tienda online de Vixan, muestra los productos que marcás para publicar, con el precio de la lista que elijas y el stock disponible.
+
+- **Qué productos se ven**: en **Catálogo**, editá el producto y marcá **Publicar en la tienda**. Los productos sin precio en la lista de la tienda no se muestran.
+- **Datos para la tienda** (en la misma ficha): subcategoría, venta por bulto (por ejemplo de a 6 unidades), precio anterior para mostrarlo como oferta, novedad, descripción y fotos (una dirección https por línea).
+- **Lista de precios**: en **Vixan Market → Mi tienda**. Ahí también ves cuántos productos están publicados y **Ver qué publica** muestra la lista exacta.
+- **Ocultar productos** sin desmarcarlos: cargá sus SKU en **SKUs que no se muestran en la tienda**.
+
 ## Facturar con ARCA
 
 Vixan emite facturas A, B o C con CAE a nombre de tu CUIT. La conexión se configura una sola vez, en **Configuración → Facturación electrónica (ARCA)**, y conviene empezar en **modo prueba**, donde las facturas no tienen validez fiscal.

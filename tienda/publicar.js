@@ -30,8 +30,8 @@ async function publicar({ probar = false, forzar = false, log = console.log } = 
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vixan-tienda-'));
   try {
-    const { manifiesto, total } = exportar(tmp, cfg);
-    log(`Tienda exportada: ${total} archivos.`);
+    const { manifiesto, total, origen, productos } = await exportar(tmp, cfg);
+    log(`Tienda exportada: ${total} archivos (catálogo ${origen}, ${productos} productos).`);
 
     const cliente = new Client(30000);
     try {
