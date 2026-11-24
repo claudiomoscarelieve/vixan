@@ -4,6 +4,11 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## Vixan Tienda 0.3.1 — 24/11/2026
+- Configuración por cliente en `tienda/clientes/<cliente>/` (`--config` en server, exportar y publicar) con carpeta de recursos propia (logo, favicon, banners).
+- Favicon, ícono para celulares y color del navegador configurables.
+- Primera tienda: **tutiendaconia.com.ar** (demostración con la identidad de Vixan, hosting DonWeb/Ferozo por FTP).
+
 ## Vixan Tienda 0.3.0 — 24/11/2026
 **Versión estática para hostings compartidos (PHP, por FTP)**:
 - `node exportar.js` genera toda la tienda como páginas HTML (home, categorías, productos, listados, mayoristas, 404, sitemap y `.htaccess`).

@@ -1,7 +1,7 @@
 // Vixan Tienda — exportación estática para hostings compartidos (PHP / FTP).
 // Genera todas las páginas como archivos HTML en una carpeta, listas para subir por FTP.
 //
-// Uso:  node exportar.js [carpeta]        (por defecto: dist)
+// Uso:  node exportar.js [carpeta] [--config archivo.json]     (carpeta por defecto: dist)
 //
 // La búsqueda y el orden de los listados funcionan en el navegador; el pedido, los favoritos
 // y WhatsApp funcionan igual que en la versión Node.
@@ -10,11 +10,8 @@ const path = require('path');
 const crypto = require('crypto');
 const { crearFuente, slug } = require('./src/datos');
 const v = require('./src/vistas');
+const { cargarConfig, archivosDe } = require('./src/config');
 
-function cargarConfig() {
-  const archivo = fs.existsSync(path.join(__dirname, 'config.json')) ? 'config.json' : 'config.ejemplo.json';
-  return JSON.parse(fs.readFileSync(path.join(__dirname, archivo), 'utf8'));
-}
 
 function exportar(destino = path.join(__dirname, 'dist'), cfg = cargarConfig()) {
   cfg = { ...cfg, _estatico: true };
@@ -58,7 +55,8 @@ function exportar(destino = path.join(__dirname, 'dist'), cfg = cargarConfig()) 
   for (const [archivo, texto] of imagenes) archivos.set(`ph/${archivo}.svg`, v.placeholder(texto));
 
   // Recursos y configuración del servidor web (Apache, el de casi todos los hostings PHP)
-  for (const f of fs.readdirSync(path.join(__dirname, 'public'))) archivos.set(f, fs.readFileSync(path.join(__dirname, 'public', f)));
+  for (const [rel, abs] of archivosDe(path.join(__dirname, 'public'))) archivos.set(rel, fs.readFileSync(abs));
+  for (const [rel, abs] of archivosDe(cfg._recursos)) archivos.set(rel, fs.readFileSync(abs)); // logo, favicon y banners del cliente
   archivos.set('.htaccess', `# Vixan Tienda (estática)
 DirectoryIndex index.html
 ErrorDocument 404 /404.html
@@ -108,7 +106,8 @@ Options -Indexes
 module.exports = { exportar, cargarConfig };
 
 if (require.main === module) {
-  const destino = path.resolve(process.argv[2] || path.join(__dirname, 'dist'));
+  const args = process.argv.slice(2).filter((a, i, l) => a !== '--config' && l[i - 1] !== '--config');
+  const destino = path.resolve(args[0] || path.join(__dirname, 'dist'));
   const r = exportar(destino);
   console.log(`Tienda exportada en ${r.destino}: ${r.paginas} páginas, ${r.total} archivos.`);
 }

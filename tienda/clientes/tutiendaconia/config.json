@@ -1,0 +1,109 @@
+{
+  "puerto": 3100,
+  "fuente": "demo",
+  "vixan": {
+    "url": "https://app.vixan.com.ar"
+  },
+  "_ftp": "Solo para la versión estática (hosting PHP): node publicar.js. La contraseña va en la variable VIXAN_FTP_CLAVE.",
+  "ftp": {
+    "host": "a0131370.ferozo.com",
+    "puerto": 21,
+    "usuario": "a0131370",
+    "carpeta": "/public_html",
+    "seguro": true
+  },
+  "tienda": {
+    "nombre": "Vixan",
+    "url": "https://tutiendaconia.com.ar",
+    "logo": "/marca/vixan-logo.png",
+    "eslogan": "Tu tienda con IA: bazar, deco y textil para tu negocio",
+    "etiquetaCarrito": "Mayorista",
+    "precioConIva": false,
+    "preciosSoloClientes": false,
+    "compraMinimaInicial": 500000,
+    "descuentoPorVolumen": {
+      "desde": 1000000,
+      "porcentaje": 10
+    },
+    "favicon": "/marca/favicon-32.png",
+    "iconoApple": "/marca/apple-touch-icon.png"
+  },
+  "tema": {
+    "primario": "#0F253C",
+    "acento": "#1FB1A4",
+    "fondo": "#ffffff",
+    "fondoSuave": "#f4f6f8",
+    "texto": "#0f172a",
+    "tipografia": "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "radio": "12px"
+  },
+  "avisos": [
+    "10% OFF en compras desde $1.000.000",
+    "Compra inicial $500.000 + IVA",
+    "Reposición sin mínimo",
+    "Envíos a todo el país"
+  ],
+  "banners": [
+    {
+      "titulo": "10% OFF",
+      "texto": "En compras desde $1.000.000",
+      "enlace": "/ofertas",
+      "imagen": ""
+    },
+    {
+      "titulo": "Primera compra $500.000 + IVA",
+      "texto": "Después reponé sin mínimo",
+      "enlace": "/mayoristas",
+      "imagen": ""
+    }
+  ],
+  "bloquesOfertas": [
+    {
+      "titulo": "Ofertas para tu negocio",
+      "texto": "Precios especiales por tiempo limitado.",
+      "categoria": "",
+      "banner": {
+        "titulo": "Bazar para tu local",
+        "texto": "Todo para equipar tu negocio",
+        "enlace": "/c/bazar",
+        "imagen": ""
+      }
+    },
+    {
+      "titulo": "Lo más pedido",
+      "texto": "Los productos que más reponen nuestros clientes.",
+      "categoria": "",
+      "banner": {
+        "titulo": "Novedades",
+        "texto": "Mirá lo último que llegó",
+        "enlace": "/novedades",
+        "imagen": ""
+      }
+    }
+  ],
+  "compra": {
+    "modalidad": "Venta mayorista",
+    "modalidadDetalle": "Venta exclusiva a comercios y revendedores mayoristas",
+    "disponibilidad": "Disponibilidad mayorista inmediata",
+    "avisoPocasUnidades": 10,
+    "pagos": "Pago con Mercado Pago o transferencia",
+    "infoPagos": "Aceptamos Mercado Pago (tarjetas y dinero en cuenta) y transferencia bancaria. Los datos para transferir se envían al confirmar el pedido.",
+    "envios": "Envíos a todo el país",
+    "despacho": "Despachamos a los 10 días de acreditado el pago; el costo del envío se coordina con la tienda.",
+    "devolucion": "Garantía de devolución de 30 días",
+    "terminos": "/mayoristas#terminos",
+    "textoTerminos": "Los cambios y devoluciones se aceptan dentro de los 30 días de recibida la mercadería, en su embalaje original. Los precios pueden cambiar sin previo aviso."
+  },
+  "contacto": {
+    "whatsapp": "5493564645996",
+    "mensajeWhatsapp": "Hola, quiero hacer una consulta sobre la tienda.",
+    "email": "",
+    "direccion": "",
+    "horario": ""
+  },
+  "paginas": {
+    "mayoristas": "Vendemos exclusivamente por mayor. La primera compra tiene un mínimo; después podés reponer sin mínimo. Los precios no incluyen IVA."
+  },
+  "_ayuda": "Tienda de demostración de Vixan Tienda en tutiendaconia.com.ar (hosting compartido DonWeb/Ferozo). Publicar: node publicar.js --config clientes/tutiendaconia/config.json",
+  "recursos": "recursos"
+}

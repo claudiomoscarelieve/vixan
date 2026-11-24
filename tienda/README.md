@@ -2,7 +2,7 @@
 
 Vidriera de e-commerce de cada cliente de Vixan. Se instala en el **servidor propio del cliente** y toma catálogo, precios y stock de Vixan (servidor central multicliente).
 
-> Versión 0.3.0: plantilla base con catálogo de ejemplo. La conexión con la API de Vixan, el checkout con Mercado Pago y las cuentas de clientes llegan en las próximas etapas.
+> Versión 0.3.1: plantilla base con catálogo de ejemplo. La conexión con la API de Vixan, el checkout con Mercado Pago y las cuentas de clientes llegan en las próximas etapas.
 
 ## Probarla
 
@@ -43,6 +43,18 @@ Copiá `config.ejemplo.json` como `config.json` (no se sube al repositorio porqu
 - `src/vistas.js`: la plantilla (páginas generadas en el servidor, sin dependencias).
 - `src/datos.js`: fuente de datos. Las vistas solo usan sus funciones, así que pasar del catálogo de ejemplo a la API de Vixan no toca la plantilla.
 - `public/tienda.css` y `public/tienda.js`: estilos y comportamiento en el navegador.
+
+## Una configuración por cliente
+
+Cada cliente tiene su carpeta en `clientes/<cliente>/` con su `config.json` y una carpeta `recursos/` (logo, favicon, banners) que se publica en la raíz de la tienda. Los comandos la usan con `--config`:
+
+```bash
+node server.js   --config clientes/tutiendaconia/config.json
+node exportar.js --config clientes/tutiendaconia/config.json
+node publicar.js --config clientes/tutiendaconia/config.json
+```
+
+Sin `--config` se usa `config.json` de esta carpeta (o `config.ejemplo.json`). La configuración no guarda contraseñas.
 
 ## Dos formas de publicar
 

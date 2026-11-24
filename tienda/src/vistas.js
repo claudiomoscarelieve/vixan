@@ -66,6 +66,7 @@ function layout(cfg, fuente, { titulo, descripcion, cuerpo, actual = '', cabeza 
   return `<!doctype html><html lang="es-AR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulo ? `${titulo} · ${t.nombre}` : t.nombre)}</title>
 <meta name="description" content="${esc(descripcion || t.eslogan || '')}">
+${t.favicon ? `<link rel="icon" href="${esc(t.favicon)}">` : ''}${t.iconoApple ? `<link rel="apple-touch-icon" href="${esc(t.iconoApple)}">` : ''}<meta name="theme-color" content="${esc(cfg.tema?.primario || '#0F253C')}">
 ${cabeza}<style>${cssTema(cfg.tema)}</style><link rel="stylesheet" href="/tienda.css">
 </head><body>
 <a class="saltar" href="#contenido">Ir al contenido</a>

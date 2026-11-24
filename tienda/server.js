@@ -6,8 +6,8 @@ const path = require('path');
 const { crearFuente } = require('./src/datos');
 const v = require('./src/vistas');
 
-const archivo = fs.existsSync(path.join(__dirname, 'config.json')) ? 'config.json' : 'config.ejemplo.json';
-const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, archivo), 'utf8'));
+const { cargarConfig } = require('./src/config');
+const cfg = cargarConfig();
 const fuente = crearFuente(cfg);
 
 const app = express();
@@ -15,6 +15,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', 'loopback'); // detrás de Caddy
 app.use((_req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); next(); });
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
+if (cfg._recursos) app.use(express.static(cfg._recursos, { maxAge: '1h' })); // logo, favicon y banners del cliente
 
 const html = (res, cuerpo, codigo = 200) => res.status(codigo).type('html').send(cuerpo);
 const orden = (req) => (['precio-asc', 'precio-desc', 'nombre'].includes(req.query.orden) ? req.query.orden : '');

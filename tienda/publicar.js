@@ -4,6 +4,7 @@
 //   node publicar.js            exporta la tienda y sube solo lo que cambió
 //   node publicar.js --probar   muestra qué subiría y qué borraría, sin tocar nada
 //   node publicar.js --forzar   publica aunque la carpeta del hosting tenga otro sitio
+//   --config clientes/<cliente>/config.json   usa la configuración de ese cliente
 //
 // Datos de FTP en config.json → "ftp". La contraseña va en la variable de entorno
 // VIXAN_FTP_CLAVE (recomendado) o en config.json → ftp.clave.
@@ -14,7 +15,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { Client } = require('basic-ftp');
-const { exportar, cargarConfig } = require('./exportar');
+const { exportar } = require('./exportar');
+const { cargarConfig } = require('./src/config');
 
 const MANIFIESTO = 'vixan-manifiesto.json';
 const IGNORAR_EN_RAIZ = new Set(['.', '..', 'cgi-bin', '.well-known', '.ftpquota', 'error_log', '.htaccess.vixan-respaldo', MANIFIESTO]);
