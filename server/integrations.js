@@ -31,7 +31,7 @@ function pedidoDesdeWoo(t, o, cuenta, cacheClientes) {
     fecha: o.date_created_gmt ? o.date_created_gmt + 'Z' : new Date().toISOString(), plataforma: 'WooCommerce',
     tipo_envio: (o.shipping_lines || [])[0]?.method_title || 'Vixan 24 h',
     cliente: `${b.first_name || ''} ${b.last_name || ''}`.trim() || b.email || 'Cliente Woo', email: b.email, telefono: b.phone,
-    direccion: [s.address_1 || b.address_1, s.address_2 || b.address_2].filter(Boolean).join(' '), localidad: s.city || b.city, cp: s.postcode || b.postcode,
+    direccion: [s.address_1 || b.address_1, s.address_2 || b.address_2].filter(Boolean).join(' '), localidad: s.city || b.city, cp: s.postcode || b.postcode, provincia: s.state || b.state || '',
     items: (o.line_items || []).map((i) => ({ sku: i.sku || `WC-${i.product_id}`, nombre: i.name, cantidad: Number(i.quantity), precio: Number(i.price) })),
     total: Number(o.total), costo_envio: Number(o.shipping_total) || 0, comision: 0, impuestos: 0, deposito: 'Central',
     pago: o.date_paid_gmt || ['processing', 'completed'].includes(o.status) ? 'Pagado' : 'Pendiente', metodo_pago: o.payment_method_title || '',
@@ -65,7 +65,7 @@ async function importarOrdenML(t, orderId) {
   const dir = envio.receiver_address || {};
   return store.create(t, 'pedidos', {
     numero: `ML-${o.id}`, external_id: o.id, origen: 'mercadolibre', cuenta: cfg.nickname || 'Mercado Libre', fecha: o.date_created, plataforma: 'Mercado Libre', tipo_envio: tipo,
-    cliente: o.buyer?.nickname || 'Comprador ML', direccion: [dir.street_name, dir.street_number].filter(Boolean).join(' '), localidad: dir.city?.name || '', cp: dir.zip_code || '',
+    cliente: o.buyer?.nickname || 'Comprador ML', direccion: [dir.street_name, dir.street_number].filter(Boolean).join(' '), localidad: dir.city?.name || '', cp: dir.zip_code || '', provincia: dir.state?.name || '',
     items: (o.order_items || []).map((i) => ({ sku: i.item?.seller_sku || i.item?.id, nombre: i.item?.title, cantidad: i.quantity, precio: i.unit_price })),
     total: o.total_amount, comision: (o.order_items || []).reduce((a, i) => a + (Number(i.sale_fee) || 0) * i.quantity, 0), costo_envio: 0, impuestos: 0, deposito: 'Central',
     pago: o.status === 'paid' ? 'Pagado' : 'Pendiente', metodo_pago: 'Mercado Pago', estado: o.status === 'cancelled' ? 'cancelado' : 'para_armar', tracking: envio.tracking_number || '',

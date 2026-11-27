@@ -290,18 +290,6 @@ async function renderCuentaCorriente(el) {
     columns: [{ k: 'numero', label: 'Pedido' }, { k: 'fecha', label: 'Fecha', fmt: date }, { k: 'plataforma', label: 'Plataforma' }, { k: 'tipo_envio', label: 'Tipo envío' }, { k: 'cliente', label: 'Cliente' }, { k: 'total', label: 'Total pedido', fmt: money, num: true }, { k: 'costoLog', label: 'Costo log.', fmt: money, num: true }, { k: 'costoPct', label: 'Costo % fact.', fmt: money, num: true }, { k: 'cobro', label: 'Estado cobro', fmt: tb }],
     footer: totalFoot(['total', 'costoLog', 'costoPct']) });
 }
-async function renderIVA(el, cual) {
-  const r = await VG.get('/api/stats/iva');
-  if (cual === 'posicion') {
-    el.innerHTML = `<div class="grid g3">${VG.kpi({ label: 'Débito fiscal (ventas)', value: money(r.debito) })}${VG.kpi({ label: 'Crédito fiscal (compras)', value: money(r.credito), tone: 'info' })}${VG.kpi({ label: r.saldo >= 0 ? 'IVA a pagar' : 'Saldo a favor', value: money(Math.abs(r.saldo)), tone: r.saldo >= 0 ? 'err' : '' })}</div><div class="note" style="margin-top:14px">La posición se calcula con las facturas emitidas (Facturación) y las facturas de compra cargadas en Reabastecimiento. Exportá los libros desde las pestañas siguientes.</div>`;
-    return;
-  }
-  const rows = cual === 'ventas' ? r.ventas : r.compras;
-  VG.crud(el, { title: `Libro IVA ${cual}`, load: async () => rows, sort: byDateDesc(), canCreate: false, canDelete: false, canEdit: false, dateFilter: 'fecha',
-    columns: [{ k: 'fecha', label: 'Fecha', fmt: date }, cual === 'ventas' ? { k: 'numero', label: 'Comprobante', get: (x) => `${x.tipo} ${x.numero}` } : { k: 'comprobante', label: 'Comprobante' }, cual === 'ventas' ? { k: 'cliente', label: 'Cliente' } : { k: 'proveedor', label: 'Proveedor' }, { k: 'neto', label: 'Neto 21%', fmt: money, num: true }, { k: 'iva', label: 'IVA 21%', fmt: money, num: true }, { k: 'total', label: 'Total', fmt: money, num: true }],
-    footer: totalFoot(['neto', 'iva', 'total']) });
-}
-
 // ═════════════ Integraciones ═════════════
 async function renderIntegraciones(el) {
   const est = await VG.get('/api/integraciones/estado');
@@ -396,30 +384,6 @@ function resultadoFacturacion(r) {
   VG.modal({ title: 'Resultado de la facturación', body: `<p><b>${ok.length}</b> emitidas · <b>${mal.length}</b> con problemas</p>
     <div class="table-wrap"><table class="t wrap"><thead><tr><th>Pedido</th><th>Resultado</th></tr></thead><tbody>${r.map((x) => `<tr><td>${esc(x.pedido)}</td><td>${x.ok ? `${badge('Factura ' + x.tipo, 'ok')} ${esc(x.factura)} · CAE ${esc(x.cae)}` : `<span style="color:var(--err)">${esc(x.error)}</span>`}</td></tr>`).join('')}</tbody></table></div>` });
 }
-async function renderPedidosAFacturar(el) {
-  const box = VG.h('<div></div>'); el.appendChild(box);
-  await avisoArca(el);
-  VG.crud(box, {
-    canCreate: false, canEdit: false, canDelete: false, selectable: true, sort: byDateDesc(),
-    load: async () => {
-      const [p, f, c] = await Promise.all([VG.get('/api/r/pedidos'), VG.get('/api/r/facturas'), VG.get('/api/r/clientes')]);
-      const fac = new Map(f.filter((x) => x.estado === 'emitida' && !String(x.tipo).startsWith('NC')).map((x) => [x.pedido_id, x]));
-      const cli = Object.fromEntries(c.map((x) => [x.nombre, x]));
-      return p.filter((x) => x.estado !== 'cancelado').map((x) => ({ ...x, est_fact: fac.has(x.id) ? 'Facturado' : 'Pendiente', factura: fac.get(x.id)?.numero || '', cond: cli[x.cliente]?.condicion_iva || 'Consumidor Final', doc: cli[x.cliente]?.cuit || '' }));
-    },
-    chips: { k: 'est_fact', options: [['Pendiente', 'Sin facturar'], ['Facturado', 'Facturados']] }, filters: [{ k: 'plataforma', label: 'Plataforma' }, { k: 'cond', label: 'Cond. IVA' }],
-    columns: [{ k: 'numero', label: 'Pedido' }, { k: 'fecha', label: 'Fecha', fmt: date }, { k: 'cliente', label: 'Cliente' }, { k: 'cond', label: 'Cond. IVA' }, { k: 'doc', label: 'CUIT/DNI' }, { k: 'plataforma', label: 'Plataforma' }, { k: 'total', label: 'Monto', fmt: money, num: true }, { k: 'est_fact', label: 'Factura', fmt: (v, r) => (v === 'Facturado' ? badge(r.factura, 'ok') : badge('Pendiente', 'warn')) }],
-    toolbar: (ctx) => [{ label: `🧾 Facturar con ARCA (${ctx.sel.size})`, primary: true, disabled: !ctx.sel.size, onClick: async () => {
-      const ids = [...ctx.sel].filter((id) => ctx.rows.find((r) => r.id === id)?.est_fact === 'Pendiente');
-      if (!ids.length) return VG.toast('Los pedidos seleccionados ya están facturados', true);
-      if (!VG.confirm(`¿Emitir ${ids.length} factura(s) en ARCA? Una vez autorizadas no se pueden borrar, solo anular con nota de crédito.`)) return;
-      VG.toast('Pidiendo CAE a ARCA…');
-      try { resultadoFacturacion(await VG.post('/api/arca/facturar-pedidos', { ids })); } catch (e) { VG.toast(e.message, true); }
-      ctx.sel.clear(); ctx.reload();
-    } }],
-    note: 'La letra se decide sola. Si sos Responsable Inscripto: A para clientes Responsables Inscriptos o Monotributistas (con CUIT) y B para el resto. Si sos Monotributista o Exento: C. La condición de IVA de cada cliente se carga en Clientes → Datos de clientes.',
-  });
-}
 async function renderComprobantes(el) {
   const box = VG.h('<div></div>'); el.appendChild(box);
   await avisoArca(el);
@@ -427,14 +391,10 @@ async function renderComprobantes(el) {
     entity: 'facturas', canCreate: false, canEdit: false, canDelete: false, sort: byDateDesc(), dateFilter: 'fecha', filters: [{ k: 'tipo', label: 'Tipo' }, { k: 'estado', label: 'Estado' }],
     columns: [{ k: 'fecha', label: 'Fecha', fmt: date }, { k: 'tipo', label: 'Tipo', fmt: (v) => badge(v, String(v).startsWith('NC') ? 'warn' : 'teal') }, { k: 'numero', label: 'Número' }, { k: 'cliente', label: 'Cliente' }, { k: 'pedido', label: 'Pedido' }, { k: 'total', label: 'Total', fmt: money, num: true }, { k: 'cae', label: 'CAE', fmt: (v, r) => (v ? `<code class="k">${esc(v)}</code>${r.ambiente === 'homologacion' ? ' ' + badge('prueba', 'warn') : ''}` : '<span class="muted small">sin CAE</span>') }, { k: 'estado', label: 'Estado', fmt: (v, r) => (v === 'anulada' ? badge('Anulada por NC ' + (r.anulada_por || ''), 'err') : tb(v)) }],
     footer: totalFoot(['total']),
-    toolbar: () => [{ label: '📝 Factura manual', primary: true, onClick: facturaManual }],
+    toolbar: () => [{ label: '📝 Factura manual', primary: true, onClick: () => VG.facturaManualNueva(() => ctx.reload()) }],
     rowActions: (r, c) => [
       ...(r.cae ? [{ label: 'Imprimir', onClick: () => imprimirFactura(r.id) }] : []),
-      ...(r.cae && r.estado === 'emitida' && !String(r.tipo).startsWith('NC') ? [{ label: 'Anular (NC)', tone: 'danger', onClick: () => {
-        const f = [{ k: 'motivo', label: 'Motivo (opcional)', full: true }];
-        const e = VG.form(f);
-        VG.modal({ title: `Nota de crédito para ${r.tipo} ${r.numero} — ${money(r.total)}`, body: e, saveLabel: 'Emitir nota de crédito', onSave: async () => { const nc = await VG.post(`/api/arca/facturas/${r.id}/nota-credito`, VG.readForm(e, f)); VG.toast(`Nota de crédito ${nc.numero} emitida`); c.reload(); } });
-      } }] : []),
+      ...(r.cae && r.estado === 'emitida' && !/^N[CD] /.test(String(r.tipo)) ? [{ label: r.nc_parcial ? 'NC (resto)' : 'Anular (NC)', tone: 'danger', onClick: () => VG.notaCredito(r, () => c.reload()) }] : []),
     ],
   });
   function facturaManual() {
@@ -643,7 +603,11 @@ VG.MODULES = [
     { label: 'Órdenes de compra', crud: { entity: 'ordenes_reabastecimiento', sort: byDateDesc(), filters: [{ k: 'estado', label: 'Estado' }, { k: 'proveedor', label: 'Proveedor' }], defaults: () => ({ fecha: VG.today(), estado: 'Borrador' }), beforeSave: (d) => ({ ...d, total: (d.items || []).reduce((a, i) => a + i.cantidad * i.precio, 0) || d.total }),
       columns: [{ k: 'numero', label: 'N° OC' }, { k: 'fecha', label: 'Fecha', fmt: date }, { k: 'proveedor', label: 'Proveedor' }, { k: 'items', label: 'Ítems', get: (r) => (r.items || []).length, num: true }, { k: 'total', label: 'Total estimado', fmt: money, num: true }, { k: 'estado', label: 'Estado', fmt: tb }, { k: 'entrega', label: 'Entrega est.', fmt: date }],
       form: [{ k: 'numero', label: 'N° OC' }, { k: 'fecha', label: 'Fecha', type: 'date' }, { k: 'proveedor', label: 'Proveedor' }, { k: 'estado', label: 'Estado', type: 'select', options: ['Borrador', 'Enviada', 'Parcial', 'Recibida', 'Cancelada'] }, { k: 'entrega', label: 'Entrega estimada', type: 'date' }, { k: 'items', label: 'Productos', type: 'items' }], newLabel: '+ Nueva orden de compra' } },
-    { label: 'Compras recibidas (facturas)', crud: { entity: 'ordenes_compra', sort: byDateDesc(), filters: [{ k: 'proveedor', label: 'Proveedor' }], columns: [{ k: 'fecha', label: 'Fecha', fmt: date }, { k: 'nro_factura', label: 'N° factura' }, { k: 'proveedor', label: 'Proveedor' }, { k: 'total', label: 'Total a pagar', fmt: money, num: true }, { k: 'deposito', label: 'Depósito' }, { k: 'estado', label: 'Estado', fmt: tb }, { k: 'vencimiento', label: 'Vencimiento', fmt: date }], form: [{ k: 'fecha', label: 'Fecha', type: 'date' }, { k: 'nro_factura', label: 'N° factura' }, { k: 'proveedor', label: 'Proveedor' }, { k: 'total', label: 'Total', type: 'number' }, { k: 'deposito', label: 'Depósito' }, { k: 'estado', label: 'Estado', type: 'select', options: ['Recibida', 'Parcial', 'Pendiente'] }, { k: 'vencimiento', label: 'Vencimiento', type: 'date' }], newLabel: '+ Cargar compra', footer: totalFoot(['total']) } },
+    { label: 'Compras recibidas (facturas)', crud: { entity: 'ordenes_compra', sort: byDateDesc(), filters: [{ k: 'proveedor', label: 'Proveedor' }], columns: [{ k: 'fecha', label: 'Fecha', fmt: date }, { k: 'nro_factura', label: 'N° factura' }, { k: 'proveedor', label: 'Proveedor' }, { k: 'total', label: 'Total a pagar', fmt: money, num: true }, { k: 'deposito', label: 'Depósito' }, { k: 'estado', label: 'Estado', fmt: tb }, { k: 'vencimiento', label: 'Vencimiento', fmt: date }], form: [{ k: 'fecha', label: 'Fecha', type: 'date' }, { k: 'nro_factura', label: 'N° factura' }, { k: 'proveedor', label: 'Proveedor' }, { k: 'total', label: 'Total', type: 'number' }, { k: 'deposito', label: 'Depósito' }, { k: 'estado', label: 'Estado', type: 'select', options: ['Recibida', 'Parcial', 'Pendiente'] }, { k: 'vencimiento', label: 'Vencimiento', type: 'date' },
+        { k: 'cbte_tipo', label: 'Datos de factura (Libro IVA Compras) · Tipo de comprobante', type: 'select', options: [['', 'Sin datos de factura (no entra al libro)'], ['A', 'Factura A'], ['B', 'Factura B'], ['C', 'Factura C'], ['M', 'Factura M'], ['NC A', 'Nota de crédito A'], ['NC B', 'Nota de crédito B'], ['NC C', 'Nota de crédito C'], ['ND A', 'Nota de débito A'], ['X', 'X (no fiscal)']], full: true },
+        { k: 'fecha_factura', label: 'Fecha de la factura', type: 'date' }, { k: 'punto_venta_factura', label: 'Punto de venta', type: 'number' }, { k: 'nro_comprobante', label: 'Número', type: 'number' }, { k: 'cuit_proveedor', label: 'CUIT del proveedor' },
+        { k: 'neto_21', label: 'Neto gravado 21%', type: 'number', step: '0.01' }, { k: 'neto_105', label: 'Neto gravado 10,5%', type: 'number', step: '0.01' }, { k: 'neto_27', label: 'Neto gravado 27%', type: 'number', step: '0.01' }, { k: 'exento', label: 'Exento / no gravado', type: 'number', step: '0.01' },
+        { k: 'percep_iva', label: 'Percepción de IVA', type: 'number', step: '0.01' }, { k: 'percep_iibb', label: 'Percepción de IIBB', type: 'number', step: '0.01' }, { k: 'jurisdiccion_iibb', label: 'Jurisdicción IIBB' }, { k: 'otros_tributos', label: 'Otros tributos / imp. internos', type: 'number', step: '0.01' }], newLabel: '+ Cargar compra', footer: totalFoot(['total']) } },
   ] },
   { id: 'proveedores', label: 'Proveedores', icon: '🏢', group: 'Compras', title: 'Proveedores, marcas y fabricantes', desc: 'Identificá qué marca y qué fabricante tiene cada producto, y a qué proveedor le comprás cada marca. Proyecciones usa esta cadena para armar las órdenes de compra.', tabs: [
     { label: 'Proveedores', crud: { entity: 'proveedores', singular: 'proveedor', newLabel: '+ Nuevo proveedor', columns: [{ k: 'nombre_fantasia', label: 'Nombre fantasía', fmt: (v) => `<b>${esc(v)}</b>` }, { k: 'razon_social', label: 'Razón social' }, { k: 'cuit', label: 'CUIT' }, { k: 'contacto', label: 'Contacto', get: (r) => [r.contacto_nombre, r.contacto_tel, r.contacto_email].filter(Boolean).join(' · ') }, { k: 'condiciones_pago', label: 'Cond. pago' }, { k: 'activo', label: 'Estado', fmt: (v) => (v !== false ? badge('Activo', 'ok') : badge('Inactivo')) }],
@@ -655,7 +619,7 @@ VG.MODULES = [
   { id: 'proveedores-cc', label: 'CC proveedores', icon: '💳', group: 'Compras', title: 'Cuenta corriente de proveedores', tabs: [{ label: 'Cuentas', render: renderCCProveedores }, { label: '📅 Calendario de pagos', render: renderCalendario }] },
 
   { id: 'facturacion', label: 'Facturación', icon: '🧮', group: 'Finanzas', title: 'Facturación electrónica', desc: 'Facturas A, B y C con CAE de ARCA. La letra sale sola según tu condición y la del cliente.', tabs: [
-    { label: 'Pedidos a facturar', render: renderPedidosAFacturar },
+    ...VG.facturacionTabs,
     { label: 'Comprobantes emitidos', render: renderComprobantes },
   ] },
   { id: 'resultados', label: 'Resultados', icon: '💹', group: 'Finanzas', title: 'Resultados', desc: 'Cuánto ganás de verdad en cada venta: ingresos menos todos los costos (comisión, envío, impuestos, mercadería y logística).', render: (v) => { const el = VG.h('<div></div>'); v.appendChild(el); renderResultados(el); } },
@@ -671,12 +635,9 @@ VG.MODULES = [
   ] },
   { id: 'impuestos', label: 'Impuestos', icon: '🏛️', group: 'Finanzas', title: 'Impuestos', tabs: [
     { label: 'Retenciones y percepciones', render: (el) => { const box = VG.h('<div><div class="card" data-r style="margin-bottom:14px"></div><div data-t></div></div>'); el.appendChild(box); VG.get('/api/r/retenciones').then((rows) => { const g = {}; for (const r of rows) { const k = r.tipo + '|' + r.jurisdiccion; (g[k] ||= { tipo: r.tipo, jur: r.jurisdiccion, n: 0, m: 0 }); g[k].n++; g[k].m += r.monto; } box.querySelector('[data-r]').innerHTML = `<h3>Resumen por tipo y jurisdicción</h3><table class="t"><thead><tr><th>Tipo</th><th>Jurisdicción</th><th class="num">Cantidad</th><th class="num">Monto</th></tr></thead><tbody>${Object.values(g).sort((a, b) => b.m - a.m).map((x) => `<tr><td>${esc(x.tipo)}</td><td>${esc(x.jur)}</td><td class="num">${x.n}</td><td class="num">${money(x.m)}</td></tr>`).join('')}</tbody></table>`; }); VG.crud(box.querySelector('[data-t]'), { entity: 'retenciones', sort: byDateDesc(), dateFilter: 'fecha', filters: [{ k: 'tipo', label: 'Tipo' }, { k: 'jurisdiccion', label: 'Jurisdicción' }], columns: [{ k: 'fecha', label: 'Fecha', fmt: date }, { k: 'tipo', label: 'Tipo' }, { k: 'jurisdiccion', label: 'Jurisdicción' }, { k: 'pedido', label: 'Pedido' }, { k: 'payment_id', label: 'Payment ID' }, { k: 'monto', label: 'Monto', fmt: money, num: true }], form: [{ k: 'fecha', label: 'Fecha', type: 'date' }, { k: 'tipo', label: 'Tipo' }, { k: 'jurisdiccion', label: 'Jurisdicción' }, { k: 'pedido', label: 'Pedido' }, { k: 'payment_id', label: 'Payment ID' }, { k: 'monto', label: 'Monto', type: 'number' }], footer: totalFoot(['monto']) }); } },
-    { label: 'IVA', render: (el) => renderIVA(el, 'posicion') },
+    { label: 'IVA', render: (el) => VG.contabilidadTabs[1].render(el) },
   ] },
-  { id: 'contabilidad', label: 'Contabilidad', icon: '📚', group: 'Finanzas', title: 'Contabilidad', tabs: [
-    { label: 'Posición mensual', render: (el) => renderIVA(el, 'posicion') }, { label: 'Libro IVA Compras', render: (el) => renderIVA(el, 'compras') }, { label: 'Libro IVA Ventas', render: (el) => renderIVA(el, 'ventas') },
-    { label: 'Plan de cuentas', crud: { entity: 'cuentas_contables', columns: [{ k: 'nombre', label: 'Cuenta' }, { k: 'tipo', label: 'Tipo', fmt: tb }], form: [{ k: 'nombre', label: 'Nombre' }, { k: 'tipo', label: 'Tipo', type: 'select', options: ['Ingreso', 'Egreso', 'Activo', 'Pasivo'] }], newLabel: '+ Nueva cuenta' } },
-  ] },
+  { id: 'contabilidad', label: 'Contabilidad', icon: '📚', group: 'Finanzas', title: 'Contabilidad', tabs: VG.contabilidadTabs },
   { id: 'auditoria', label: 'Auditoría', icon: '🔍', group: 'Finanzas', title: 'Control de reingresos de stock', desc: 'Pedidos cancelados después de despachados. Ningún cambio de stock se aplica solo: revisá y aprobá o rechazá cada caso.', tabs: [
     { label: '⏳ Pendientes', crud: { entity: 'auditoria', canCreate: false, canEdit: false, canDelete: false, load: async () => (await VG.get('/api/r/auditoria')).filter((a) => a.estado === 'pendiente'), columns: [{ k: 'pedido', label: 'Pedido' }, { k: 'fecha', label: 'Fecha', fmt: date }, { k: 'cliente', label: 'Cliente' }, { k: 'plataforma', label: 'Plataforma' }, { k: 'productos', label: 'Productos' }, { k: 'total', label: 'Total', fmt: money, num: true }], rowActions: (r, ctx) => [{ label: 'Aprobar', onClick: async () => { await VG.post(`/api/auditoria/${r.id}/resolver`, { accion: 'aprobar' }); VG.toast('Reingreso aprobado: stock devuelto a Central'); ctx.reload(); } }, { label: 'Rechazar', tone: 'danger', onClick: async () => { const nota = prompt('Motivo del rechazo') || ''; await VG.post(`/api/auditoria/${r.id}/resolver`, { accion: 'rechazar', nota }); ctx.reload(); } }], empty: 'Sin reingresos pendientes.' } },
     { label: 'Historial', crud: { entity: 'auditoria', canCreate: false, canEdit: false, canDelete: false, load: async () => (await VG.get('/api/r/auditoria')).filter((a) => a.estado !== 'pendiente'), columns: [{ k: 'resuelto_at', label: 'Fecha', fmt: datetime }, { k: 'pedido', label: 'Pedido' }, { k: 'estado', label: 'Resultado', fmt: tb }, { k: 'resuelto_por', label: 'Aprobado por' }, { k: 'nota', label: 'Nota' }] } },

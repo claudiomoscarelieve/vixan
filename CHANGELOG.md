@@ -4,6 +4,26 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## 1.7.0 — 27/11/2026
+**Facturación** (Finanzas → Facturación):
+- Panel por período con seis tarjetas (sin facturar, facturado, facturable, notas de crédito, cancelados y emitido según ARCA), filtros y "Facturar seleccionadas / Facturar todo".
+- Factura manual con renglones a precio neto, varias alícuotas (21, 10,5, 27, 5, 2,5 y 0 %) e impuestos internos; notas de débito y notas de crédito manuales con comprobante asociado.
+- Notas de crédito parciales (repartidas por alícuota) y "NC (resto)"; la factura queda anulada cuando se cubre el total.
+- Comprobantes faltantes (huecos y autorizados en ARCA que no están en Vixan) y "Traer de ARCA" (FECompConsultar).
+- Pedidos cancelados con factura: NC en lote y NC automática al cancelar.
+- Exportar facturas: resumen por comprobante (netos e IVA por alícuota) o detalle por producto, en Excel, PDF o texto.
+- Una factura B a un Responsable Inscripto o Monotributista se rechaza antes de ir a ARCA.
+
+**Contabilidad** (Finanzas → Contabilidad), 14 pestañas:
+- Resumen con tareas pendientes y reporte para el contador; posición mensual de IVA con saldo técnico y de libre disponibilidad que pasan de mes, IIBB e impuestos internos.
+- Libros IVA Compras y Ventas que combinan lo de Vixan con "Mis Comprobantes" de ARCA (CSV o Excel, formato viejo y nuevo) y archivos del Libro IVA Digital (RG 4597) para IVA Simple.
+- Libro diario con asientos automáticos y manuales, mayor y saldos, balance.
+- Bienes de uso con cuenta propia y amortización anual o mensual; bancos con extracto y conciliación sugerida; cheques recibidos y emitidos; préstamos (francés o alemán, IVA sobre intereses).
+- Ingresos Brutos por provincia (Convenio Multilateral) con alícuotas propias.
+- Plan de cuentas modelo editable e imputación de los asientos automáticos por concepto, categoría de gasto y proveedor.
+- Compras recibidas: nuevos datos de factura (tipo, número, CUIT, netos por alícuota, percepciones) para el Libro IVA Compras.
+- Los pedidos de WooCommerce y Mercado Libre guardan la provincia.
+
 ## 1.6.0 — 24/11/2026
 **Importar productos desde Excel o CSV** (Catálogo → 📥 Importar desde Excel/CSV):
 - Lee .xlsx, .csv (separado por punto y coma, coma o tabulación) y la planilla .xls que exporta Vixan. Sin dependencias nuevas.

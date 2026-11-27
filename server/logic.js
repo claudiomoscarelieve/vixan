@@ -71,6 +71,7 @@ function cambiarEstadoPedido(t, id, estado, userId) {
     store.create(t, 'auditoria', { pedido: p.numero, pedido_id: p.id, fecha: new Date().toISOString(), cliente: p.cliente, plataforma: p.plataforma, productos: (p.items || []).map((i) => `${i.cantidad}× ${i.sku}`).join(', '), total: p.total, estado: 'pendiente' });
   }
   const patch = { estado };
+  if (estado === 'cancelado' && antes !== 'cancelado') setImmediate(() => { try { require('./facturacion').alCancelar(t, p); } catch { /* sin facturación */ } });
   if (estado === 'enviado' && !p.tracking) patch.tracking = 'VG' + String(p.id).padStart(8, '0');
   if (estado === 'entregado') patch.entregado_at = new Date().toISOString();
   return store.update(t, 'pedidos', id, patch);

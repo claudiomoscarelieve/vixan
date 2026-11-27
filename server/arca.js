@@ -15,7 +15,7 @@ const URLS = {
 const urlDe = (amb, svc) => process.env[`ARCA_${svc.toUpperCase()}_URL`] || URLS[amb][svc];
 
 // Tipos de comprobante (tabla de ARCA)
-const CBTE = { A: 1, B: 6, C: 11, 'NC A': 3, 'NC B': 8, 'NC C': 13 };
+const CBTE = { A: 1, B: 6, C: 11, 'NC A': 3, 'NC B': 8, 'NC C': 13, 'ND A': 2, 'ND B': 7, 'ND C': 12 };
 const LETRA_DE_CODIGO = Object.fromEntries(Object.entries(CBTE).map(([k, v]) => [v, k]));
 // Condición frente al IVA del receptor (FEParamGetCondicionIvaReceptor)
 const COND_IVA = {
@@ -25,7 +25,8 @@ const COND_IVA = {
 };
 const COND_IVA_NOMBRE = Object.fromEntries(Object.entries(COND_IVA).map(([k, v]) => [v, k]));
 const RECIBE_A = new Set([1, 6, 13, 16]); // los demás reciben B
-const ALICUOTAS = { 21: 5, 10.5: 4, 27: 6, 0: 3 }; // % → Id de ARCA
+const ALICUOTAS = { 21: 5, 10.5: 4, 27: 6, 5: 8, 2.5: 9, 0: 3 }; // % → Id de ARCA
+const ALICUOTA_DE_ID = Object.fromEntries(Object.entries(ALICUOTAS).map(([k, v]) => [v, Number(k)]));
 const UMBRAL_IDENTIFICAR_CF = Number(process.env.ARCA_UMBRAL_CF) || 10000000; // RG 5700/2025
 
 const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -188,6 +189,54 @@ function cuitValido(c) {
 }
 const yyyymmdd = (iso) => String(iso).slice(0, 10).replace(/-/g, '');
 
+// Importes de un comprobante con varias alícuotas e impuestos internos.
+// lineas: [{ cantidad, precio, alicuota, imp_int }] — precio NETO por unidad (sin IVA) e imp_int por unidad.
+// Para la clase C no se discrimina IVA: el neto es todo lo cobrado (sin los impuestos internos).
+function calcularImportes(letra, lineas) {
+  const base = String(letra).replace(/^(NC|ND) /, '');
+  const grupos = new Map();
+  let netoTotal = 0, impInt = 0, baseImpInt = 0;
+  for (const l of lineas) {
+    const cant = Number(l.cantidad) || 0;
+    const neto = r2(cant * Number(l.precio || 0));
+    const ii = r2(cant * Number(l.imp_int || 0));
+    if (!(neto > 0) && !(ii > 0)) continue;
+    const alic = base === 'C' ? 0 : Number(l.alicuota ?? 21);
+    if (base !== 'C' && ALICUOTAS[alic] === undefined) throw new Error(`Alícuota de IVA ${alic}% no soportada`);
+    netoTotal = r2(netoTotal + neto);
+    if (ii > 0) { impInt = r2(impInt + ii); baseImpInt = r2(baseImpInt + neto); }
+    if (base !== 'C') { const g = grupos.get(alic) || { alic, neto: 0, iva: 0 }; g.neto = r2(g.neto + neto); grupos.set(alic, g); }
+  }
+  const alicuotas = [...grupos.values()].map((g) => ({ ...g, iva: r2(g.neto * g.alic / 100) })).sort((a, b) => b.alic - a.alic);
+  const iva = r2(alicuotas.reduce((a, g) => a + g.iva, 0));
+  const total = r2(netoTotal + iva + impInt);
+  return { total, neto: netoTotal, iva, imp_internos: impInt, base_imp_internos: baseImpInt, alicuotas, alicuota: alicuotas.length === 1 ? alicuotas[0].alic : (alicuotas.length ? null : 0) };
+}
+// De un total con IVA incluido (pedidos) a líneas netas, con una sola alícuota
+function lineasDesdeTotal(total, alicuota = 21, letra = 'B') {
+  const base = String(letra).replace(/^(NC|ND) /, '');
+  const neto = base === 'C' ? r2(total) : r2(Number(total) / (1 + alicuota / 100));
+  // se ajusta el neto para que neto + IVA dé exactamente el total cobrado
+  let n = neto;
+  if (base !== 'C') { const iva = r2(n * alicuota / 100); n = r2(n + (r2(total) - r2(n + iva))); }
+  return [{ cantidad: 1, precio: n, alicuota }];
+}
+function xmlImportes(imp, letra) {
+  const base = String(letra).replace(/^(NC|ND) /, '');
+  const iva = base === 'C' || !imp.alicuotas.length ? '' : `<ar:Iva>${imp.alicuotas.map((g) => `<ar:AlicIva><ar:Id>${ALICUOTAS[g.alic]}</ar:Id><ar:BaseImp>${g.neto.toFixed(2)}</ar:BaseImp><ar:Importe>${g.iva.toFixed(2)}</ar:Importe></ar:AlicIva>`).join('')}</ar:Iva>`;
+  const trib = imp.imp_internos > 0 ? `<ar:Tributos><ar:Tributo><ar:Id>4</ar:Id><ar:Desc>Impuestos internos</ar:Desc><ar:BaseImp>${imp.base_imp_internos.toFixed(2)}</ar:BaseImp><ar:Alic>${(imp.base_imp_internos ? r2(imp.imp_internos / imp.base_imp_internos * 100) : 0).toFixed(2)}</ar:Alic><ar:Importe>${imp.imp_internos.toFixed(2)}</ar:Importe></ar:Tributo></ar:Tributos>` : '';
+  return { iva, trib };
+}
+function validarReceptor(letra, total, condReceptor, doc) {
+  const base = String(letra).replace(/^(NC|ND) /, '');
+  if (!(total > 0)) throw new Error('El total tiene que ser mayor a cero');
+  if (base === 'A' && doc.docTipo !== 80) throw new Error('Para factura A el cliente tiene que tener CUIT (11 dígitos)');
+  if (doc.docTipo === 80 && !cuitValido(doc.docNro)) throw new Error(`El CUIT ${doc.docNro} no es válido (revisá los números en la ficha del cliente)`);
+  if (base === 'A' && !RECIBE_A.has(Number(condReceptor))) throw new Error('La factura A es solo para Responsables Inscriptos y Monotributistas');
+  if (base === 'B' && RECIBE_A.has(Number(condReceptor))) throw new Error('A un Responsable Inscripto o Monotributista se le hace factura A, no B');
+  if (base === 'B' && Number(condReceptor) === 5 && doc.docTipo === 99 && total >= UMBRAL_IDENTIFICAR_CF) throw new Error(`Desde $${UMBRAL_IDENTIFICAR_CF.toLocaleString('es-AR')} hay que identificar al consumidor final: cargale DNI o CUIT al cliente`);
+}
+
 // Prepara los importes y valida antes de ir a ARCA (los errores de ARCA son crípticos)
 function armarComprobante(t, { letra, total, alicuota = 21, condReceptor, doc }) {
   total = r2(total);
@@ -205,20 +254,25 @@ function armarComprobante(t, { letra, total, alicuota = 21, condReceptor, doc })
   return { total, neto, iva, alicuota, ivaXml: `<ar:Iva><ar:AlicIva><ar:Id>${idAlic}</ar:Id><ar:BaseImp>${neto.toFixed(2)}</ar:BaseImp><ar:Importe>${iva.toFixed(2)}</ar:Importe></ar:AlicIva></ar:Iva>` };
 }
 
-async function emitir(t, { letra, total, alicuota, condReceptor = 5, cuitODni, fecha, asociado }) {
+async function emitir(t, { letra, total, alicuota, condReceptor = 5, cuitODni, fecha, asociado, lineas }) {
   const f = fiscal(t);
   const pto = Number(f.punto_venta);
   if (!pto) throw new Error('Falta el punto de venta en Datos de facturación (tiene que ser uno habilitado para "Web Services" en ARCA)');
   const cbteTipo = CBTE[letra];
+  if (!cbteTipo) throw new Error(`Tipo de comprobante desconocido: ${letra}`);
+  if (/^(NC|ND) /.test(letra) && !asociado) throw new Error('Las notas de crédito y de débito tienen que indicar el comprobante que corrigen');
   const doc = documentoDe(cuitODni);
-  const imp = armarComprobante(t, { letra, total, alicuota, condReceptor, doc });
+  const calc = calcularImportes(letra, lineas || lineasDesdeTotal(total, alicuota ?? 21, letra));
+  validarReceptor(letra, calc.total, condReceptor, doc);
+  const x = xmlImportes(calc, letra);
+  const imp = { ...calc, ivaXml: x.iva, tribXml: x.trib };
   const nro = (await ultimoAutorizado(t, pto, cbteTipo)) + 1;
   const fch = yyyymmdd(fecha || new Date(Date.now() - 3 * 3600000).toISOString());
-  const asoc = asociado ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${asociado.cbte_tipo}</ar:Tipo><ar:PtoVta>${asociado.punto_venta}</ar:PtoVta><ar:Nro>${asociado.nro}</ar:Nro><ar:Cuit>${soloDigitos(f.cuit)}</ar:Cuit><ar:CbteFch>${yyyymmdd(asociado.fecha)}</ar:CbteFch></ar:CbteAsoc></ar:CbtesAsoc>` : '';
+  const asoc = asociado ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${asociado.cbte_tipo}</ar:Tipo><ar:PtoVta>${asociado.punto_venta}</ar:PtoVta><ar:Nro>${asociado.nro}</ar:Nro><ar:Cuit>${soloDigitos(f.cuit)}</ar:Cuit>${asociado.fecha ? `<ar:CbteFch>${yyyymmdd(asociado.fecha)}</ar:CbteFch>` : ''}</ar:CbteAsoc></ar:CbtesAsoc>` : '';
   const det = `<ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${pto}</ar:PtoVta><ar:CbteTipo>${cbteTipo}</ar:CbteTipo></ar:FeCabReq><ar:FeDetReq><ar:FECAEDetRequest>`
     + `<ar:Concepto>1</ar:Concepto><ar:DocTipo>${doc.docTipo}</ar:DocTipo><ar:DocNro>${doc.docNro}</ar:DocNro><ar:CbteDesde>${nro}</ar:CbteDesde><ar:CbteHasta>${nro}</ar:CbteHasta><ar:CbteFch>${fch}</ar:CbteFch>`
-    + `<ar:ImpTotal>${imp.total.toFixed(2)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${imp.neto.toFixed(2)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${imp.iva.toFixed(2)}</ar:ImpIVA>`
-    + `<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>${Number(condReceptor)}</ar:CondicionIVAReceptorId>${asoc}${imp.ivaXml}`
+    + `<ar:ImpTotal>${imp.total.toFixed(2)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${imp.neto.toFixed(2)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>${imp.imp_internos.toFixed(2)}</ar:ImpTrib><ar:ImpIVA>${imp.iva.toFixed(2)}</ar:ImpIVA>`
+    + `<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>${Number(condReceptor)}</ar:CondicionIVAReceptorId>${asoc}${imp.tribXml}${imp.ivaXml}`
     + `</ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq>`;
   const { resp, errores } = await wsfe(t, 'FECAESolicitar', det);
   const resultado = tag(resp, 'Resultado');
@@ -228,7 +282,7 @@ async function emitir(t, { letra, total, alicuota, condReceptor = 5, cuitODni, f
   const caeVto = tag(tag(resp, 'FECAEDetResponse') || '', 'CAEFchVto');
   return {
     tipo: letra, cbte_tipo: cbteTipo, punto_venta: pto, nro, numero: `${String(pto).padStart(5, '0')}-${String(nro).padStart(8, '0')}`,
-    fecha: `${fch.slice(0, 4)}-${fch.slice(4, 6)}-${fch.slice(6)}`, total: imp.total, neto: imp.neto, iva: imp.iva, alicuota: imp.alicuota,
+    fecha: `${fch.slice(0, 4)}-${fch.slice(4, 6)}-${fch.slice(6)}`, total: imp.total, neto: imp.neto, iva: imp.iva, alicuota: imp.alicuota, alicuotas: imp.alicuotas, imp_internos: imp.imp_internos,
     doc_tipo: doc.docTipo, doc_nro: doc.docNro, cond_iva_receptor: Number(condReceptor), cae, cae_vto: caeVto ? `${caeVto.slice(0, 4)}-${caeVto.slice(4, 6)}-${caeVto.slice(6)}` : null,
     ambiente: arcaCfg(t).ambiente || 'homologacion', observaciones: obs, estado: 'emitida',
   };
@@ -264,22 +318,130 @@ async function facturarPedidos(t, ids) {
   }
   return out;
 }
+// Factura manual (sin pedido): líneas con precio NETO, alícuota por línea e impuestos internos.
+// tipo: 'auto' (la letra sale sola) o un tipo concreto (A, B, C, NC A…, ND B…). Las NC/ND necesitan el comprobante asociado.
 async function facturaManual(t, b) {
   const condReceptor = Number(b.cond_iva_receptor) || 5;
-  const items = (b.items || []).filter((i) => i.nombre || i.sku);
-  const total = items.length ? items.reduce((a, i) => a + Number(i.cantidad) * Number(i.precio), 0) : Number(b.total);
-  const f = await emitir(t, { letra: letraPara(t, condReceptor), total, alicuota: Number(b.alicuota) || 21, condReceptor, cuitODni: b.cuit });
-  return store.create(t, 'facturas', { ...f, cliente: b.cliente || 'Consumidor final', domicilio: b.domicilio || '', items, manual: true });
+  let items = (b.items || []).filter((i) => (i.nombre || i.sku) && Number(i.cantidad) > 0);
+  let lineas;
+  if (items.length && items.some((i) => i.neto !== undefined || i.alicuota !== undefined || i.imp_int !== undefined)) {
+    lineas = items.map((i) => ({ cantidad: Number(i.cantidad), precio: Number(i.neto ?? i.precio), alicuota: Number(i.alicuota ?? b.alicuota ?? 21), imp_int: Number(i.imp_int || 0) }));
+  } else {
+    // versión anterior: precios con IVA incluido y una sola alícuota
+    const total = items.length ? items.reduce((a, i) => a + Number(i.cantidad) * Number(i.precio), 0) : Number(b.total);
+    lineas = null; b._total = total;
+  }
+  let letra = b.tipo && b.tipo !== 'auto' ? b.tipo : letraPara(t, condReceptor);
+  if (condicionEmisor(t) !== 'RI' && !/C$/.test(letra)) throw new Error('Como Monotributista o Exento solo podés emitir comprobantes C');
+  let asociado = null;
+  if (/^(NC|ND) /.test(letra)) {
+    const m = String(b.asociado || '').match(/^\s*(\d+)\s*-\s*(\d+)\s*$/);
+    if (!m) throw new Error('Indicá el comprobante asociado como punto de venta y número, por ejemplo 5-123');
+    const base = letra.slice(3);
+    const tipoAsoc = letra.startsWith('ND') && b.asociado_tipo === 'nc' ? `NC ${base}` : base;
+    const pv = Number(m[1]), nro = Number(m[2]);
+    const orig = store.list(t, 'facturas').find((f) => f.cbte_tipo === CBTE[tipoAsoc] && Number(f.punto_venta) === pv && Number(f.nro) === nro);
+    asociado = { cbte_tipo: CBTE[tipoAsoc], punto_venta: pv, nro, fecha: orig?.fecha || null };
+    if (orig) b._asociado = orig;
+  }
+  const f = await emitir(t, { letra, total: b._total, alicuota: Number(b.alicuota) || 21, lineas, condReceptor, cuitODni: b.cuit, asociado });
+  const reg = store.create(t, 'facturas', { ...f, cliente: b.cliente || 'Consumidor final', domicilio: b.domicilio || '', items, manual: true, ...(b._asociado ? { asociada: b._asociado.numero, asociada_id: b._asociado.id } : {}) });
+  if (b._asociado && letra.startsWith('NC')) registrarNC(t, b._asociado, reg);
+  return reg;
 }
-async function notaCredito(t, facturaId, motivo) {
+// Suma lo acreditado a la factura original y la marca anulada cuando la NC cubre todo
+function registrarNC(t, orig, nc) {
+  const acreditado = r2(Number(orig.nc_total || 0) + Number(nc.total));
+  const total = acreditado >= Number(orig.total) - 0.01;
+  store.update(t, 'facturas', orig.id, { nc_total: acreditado, ncs: [...(orig.ncs || []), nc.numero], ...(total ? { estado: 'anulada', anulada_por: nc.numero } : { nc_parcial: true }) });
+}
+// Nota de crédito por el total (o por un monto menor: parcial, proporcional a cada alícuota)
+async function notaCredito(t, facturaId, motivo, monto) {
   const orig = store.get(t, 'facturas', facturaId);
   if (!orig || !orig.cae) throw new Error('Solo se pueden anular facturas emitidas con CAE');
-  if (String(orig.tipo).startsWith('NC')) throw new Error('No se puede anular una nota de crédito');
-  if (orig.anulada_por) throw new Error('Esa factura ya tiene nota de crédito');
-  const nc = await emitir(t, { letra: `NC ${orig.tipo}`, total: orig.total, alicuota: orig.alicuota || 21, condReceptor: orig.cond_iva_receptor, cuitODni: orig.doc_nro !== '0' ? orig.doc_nro : '', asociado: orig });
-  const reg = store.create(t, 'facturas', { ...nc, cliente: orig.cliente, domicilio: orig.domicilio, pedido: orig.pedido, pedido_id: orig.pedido_id, items: orig.items, asociada: orig.numero, asociada_id: orig.id, motivo: motivo || '' });
-  store.update(t, 'facturas', orig.id, { estado: 'anulada', anulada_por: reg.numero });
+  if (/^NC /.test(String(orig.tipo))) throw new Error('No se puede anular una nota de crédito');
+  if (orig.estado === 'anulada') throw new Error('Esa factura ya tiene nota de crédito por el total');
+  const pendiente = r2(Number(orig.total) - Number(orig.nc_total || 0));
+  const importe = monto ? r2(Number(monto)) : pendiente;
+  if (!(importe > 0) || importe > pendiente + 0.01) throw new Error(`El importe de la nota de crédito tiene que ser de hasta ${pendiente.toFixed(2)}`);
+  const base = String(orig.tipo).replace(/^ND /, '');
+  const factor = importe / Number(orig.total);
+  let lineas;
+  if (orig.alicuotas?.length || orig.imp_internos) {
+    lineas = (orig.alicuotas || []).map((g) => ({ cantidad: 1, precio: r2(g.neto * factor), alicuota: g.alic }));
+    if (base === 'C') lineas = [{ cantidad: 1, precio: r2((Number(orig.neto) || Number(orig.total)) * factor), alicuota: 0 }];
+    if (orig.imp_internos) { lineas[0] = lineas[0] || { cantidad: 1, precio: 0, alicuota: 0 }; lineas[0].imp_int = r2(orig.imp_internos * factor); }
+    // el redondeo por alícuota puede correr un centavo: se ajusta en la primera línea
+    for (let k = 0; k < 8 && lineas[0]; k++) {
+      const dif = r2(importe - calcularImportes(`NC ${base}`, lineas).total);
+      if (!dif) break;
+      const paso = Math.abs(dif) >= 0.05 ? r2(dif / (1 + (base === 'C' ? 0 : lineas[0].alicuota / 100))) : Math.sign(dif) * 0.01;
+      lineas[0].precio = r2(lineas[0].precio + paso);
+    }
+  }
+  const nc = await emitir(t, { letra: `NC ${base}`, total: importe, alicuota: orig.alicuota || 21, lineas, condReceptor: orig.cond_iva_receptor, cuitODni: orig.doc_nro !== '0' ? orig.doc_nro : '', asociado: orig });
+  const reg = store.create(t, 'facturas', { ...nc, cliente: orig.cliente, domicilio: orig.domicilio, pedido: orig.pedido, pedido_id: orig.pedido_id, items: factor >= 0.9999 ? orig.items : [], asociada: orig.numero, asociada_id: orig.id, motivo: motivo || '', manual: !!orig.manual });
+  registrarNC(t, orig, reg);
   return reg;
+}
+
+// ───────────── Consultas a ARCA ─────────────
+// Trae un comprobante ya autorizado (FECompConsultar). Devuelve null si ARCA no lo tiene.
+async function consultarComprobante(t, cbteTipo, ptoVta, nro) {
+  const { resp, errores } = await wsfe(t, 'FECompConsultar', `<ar:FeCompConsReq><ar:CbteTipo>${cbteTipo}</ar:CbteTipo><ar:CbteNro>${nro}</ar:CbteNro><ar:PtoVta>${ptoVta}</ar:PtoVta></ar:FeCompConsReq>`);
+  const r = tag(resp, 'ResultGet');
+  if (!r) { if (errores.some((e) => /^602/.test(e))) return null; if (errores.length) throw new Error(`ARCA: ${errores.join(' · ')}`); return null; }
+  const g = (n) => tag(r, n);
+  const fch = g('CbteFch') || '';
+  const alicuotas = tags(tag(r, 'Iva') || '', 'AlicIva').map((a) => ({ alic: ALICUOTA_DE_ID[Number(tag(a, 'Id'))] ?? 0, neto: Number(tag(a, 'BaseImp')), iva: Number(tag(a, 'Importe')) }));
+  const tribs = tags(tag(r, 'Tributos') || '', 'Tributo').map((x) => ({ id: Number(tag(x, 'Id')), importe: Number(tag(x, 'Importe')) }));
+  return {
+    cbte_tipo: Number(g('CbteTipo') || cbteTipo), punto_venta: Number(g('PtoVta') || ptoVta), nro: Number(g('CbteDesde') || nro),
+    fecha: fch ? `${fch.slice(0, 4)}-${fch.slice(4, 6)}-${fch.slice(6, 8)}` : null, doc_tipo: Number(g('DocTipo')), doc_nro: g('DocNro'),
+    total: Number(g('ImpTotal')), neto: Number(g('ImpNeto')), iva: Number(g('ImpIVA')), exento: Number(g('ImpOpEx') || 0), no_gravado: Number(g('ImpTotConc') || 0),
+    imp_internos: tribs.filter((x) => x.id === 4).reduce((a, x) => a + x.importe, 0), otros_tributos: tribs.filter((x) => x.id !== 4).reduce((a, x) => a + x.importe, 0),
+    alicuotas, cae: g('CodAutorizacion'), cae_vto: g('FchVto'), resultado: g('Resultado'), cond_iva_receptor: Number(g('CondicionIVAReceptorId') || 0) || null,
+  };
+}
+// Registra en Vixan un comprobante que ARCA autorizó y acá no estaba
+async function recuperarComprobante(t, letra, nro, ptoVta) {
+  const cbteTipo = CBTE[letra];
+  if (!cbteTipo) throw new Error('Tipo de comprobante desconocido');
+  const pv = Number(ptoVta || fiscal(t).punto_venta);
+  const ya = store.list(t, 'facturas').find((f) => f.cbte_tipo === cbteTipo && Number(f.punto_venta) === pv && Number(f.nro) === Number(nro));
+  if (ya) throw new Error(`El comprobante ${letra} ${ya.numero} ya está registrado`);
+  const c = await consultarComprobante(t, cbteTipo, pv, Number(nro));
+  if (!c) throw new Error(`ARCA no tiene el comprobante ${letra} ${pv}-${nro}`);
+  const cli = c.doc_nro && c.doc_nro !== '0' ? store.list(t, 'clientes').find((x) => soloDigitos(x.cuit) === String(c.doc_nro)) : null;
+  return store.create(t, 'facturas', {
+    ...c, tipo: letra, numero: `${String(pv).padStart(5, '0')}-${String(c.nro).padStart(8, '0')}`, estado: 'emitida', recuperada: true, manual: true,
+    cliente: cli?.razon_social || cli?.nombre || (c.doc_tipo === 99 ? 'Consumidor final' : `Doc. ${c.doc_nro}`), alicuota: c.alicuotas.length === 1 ? c.alicuotas[0].alic : null,
+    cond_iva_receptor: c.cond_iva_receptor || (c.doc_tipo === 80 && /^A/.test(letra) ? 1 : 5), ambiente: arcaCfg(t).ambiente || 'homologacion', items: [],
+  });
+}
+// Números que faltan en el registro: huecos entre el primero y el último de cada punto de venta y tipo,
+// y (si hay conexión con ARCA) lo que ARCA autorizó después del último registrado.
+async function faltantes(t, { desde, hasta, consultarArca = true } = {}) {
+  const todas = store.list(t, 'facturas').filter((f) => f.cae && f.nro && f.punto_venta);
+  const grupos = new Map();
+  for (const f of todas) { const k = `${f.punto_venta}|${f.cbte_tipo}`; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(f); }
+  const faltan = [], avisos = [];
+  for (const [k, fs] of grupos) {
+    const [pv, tipo] = k.split('|').map(Number);
+    const nums = fs.map((f) => Number(f.nro)).sort((a, b) => a - b);
+    const enRango = fs.filter((f) => (!desde || f.fecha >= desde) && (!hasta || f.fecha <= hasta)).map((f) => Number(f.nro));
+    if (!enRango.length) continue;
+    const min = Math.min(...enRango), max = Math.max(...enRango);
+    const set = new Set(nums);
+    for (let n = min; n <= max; n++) if (!set.has(n)) faltan.push({ letra: LETRA_DE_CODIGO[tipo], cbte_tipo: tipo, punto_venta: pv, nro: n, motivo: 'hueco en la numeración' });
+    if (consultarArca && arcaCfg(t).tiene_cert) {
+      try {
+        const ult = await ultimoAutorizado(t, pv, tipo);
+        for (let n = nums[nums.length - 1] + 1; n <= ult && n <= nums[nums.length - 1] + 50; n++) faltan.push({ letra: LETRA_DE_CODIGO[tipo], cbte_tipo: tipo, punto_venta: pv, nro: n, motivo: 'ARCA lo autorizó después del último registrado' });
+      } catch (e) { avisos.push(`No se pudo consultar ARCA para ${LETRA_DE_CODIGO[tipo]} ${pv}: ${e.message}`); }
+    }
+  }
+  return { faltan, avisos, controlados: grupos.size };
 }
 
 async function probar(t) {
@@ -297,4 +459,4 @@ function estado(t) {
   return { ambiente: a.ambiente || 'homologacion', tiene_clave: !!a.tiene_clave, tiene_cert: !!a.tiene_cert, cert_vence: a.cert_vence || null, cert_cn: a.cert_cn || null, cuit: f.cuit || '', razon_social: f.razon_social || '', punto_venta: f.punto_venta || '', condicion_iva: f.condicion_iva || '', emisor: condicionEmisor(t), csr: a.tiene_clave && !a.tiene_cert ? secretos(t).csr : null };
 }
 
-module.exports = { cuitValido, generarCSR, guardarCertificado, probar, estado, facturarPedidos, facturaManual, notaCredito, letraPara, condicionEmisor, COND_IVA, COND_IVA_NOMBRE, LETRA_DE_CODIGO, armarComprobante, documentoDe };
+module.exports = { cuitValido, generarCSR, guardarCertificado, probar, estado, facturarPedidos, facturaManual, notaCredito, letraPara, condicionEmisor, COND_IVA, COND_IVA_NOMBRE, LETRA_DE_CODIGO, CBTE, ALICUOTAS, armarComprobante, documentoDe, calcularImportes, consultarComprobante, recuperarComprobante, faltantes };

@@ -216,4 +216,4 @@ function importar(t, { nombre, contenido, probar = true, publicar = true, stockI
   return res;
 }
 
-module.exports = { importar, leerArchivo };
+module.exports = { importar, leerArchivo, numero };

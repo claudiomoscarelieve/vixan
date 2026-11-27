@@ -115,7 +115,11 @@ function seedDemo(t) {
       const monto = int(250, 1800) * 1000;
       const nro = `${String(int(1, 9)).padStart(4, '0')}-${String(int(1000, 99999)).padStart(8, '0')}`;
       C('cc_proveedores', { proveedor_id: prov.id, fecha: ymd(f), tipo_factura: 'A', nro_factura: nro, concepto: 'Compra de mercadería', debito: monto, credito: 0 });
-      C('ordenes_compra', { fecha: ymd(f), nro_factura: nro, proveedor: prov.nombre_fantasia, proveedor_id: prov.id, total: monto, deposito: 'Central', estado: 'Recibida', vencimiento: ymd(f + (prov.plazo_pago_dias || 0) * DAY) });
+      // la mayoría con los datos de la factura A para el Libro IVA Compras
+      const neto = Math.round(monto / 1.21 * 100) / 100;
+      const conFactura = rnd() < 0.7;
+      C('ordenes_compra', { fecha: ymd(f), nro_factura: nro, proveedor: prov.nombre_fantasia, proveedor_id: prov.id, total: monto, deposito: 'Central', estado: 'Recibida', vencimiento: ymd(f + (prov.plazo_pago_dias || 0) * DAY),
+        ...(conFactura ? { cbte_tipo: 'A', fecha_factura: ymd(f), punto_venta_factura: 2 + pi, nro_comprobante: int(1000, 99999), cuit_proveedor: prov.cuit || '', neto_21: neto, iva_21: Math.round((monto - neto) * 100) / 100 } : {}) });
       if (rnd() > 0.45) C('cc_proveedores', { proveedor_id: prov.id, fecha: ymd(f + int(5, 40) * DAY), concepto: 'Pago por transferencia', debito: 0, credito: monto });
     }
     C('ordenes_reabastecimiento', { numero: `OC-0000${pi + 1}`, fecha: ymd(hoy - int(1, 10) * DAY), proveedor: prov.nombre_fantasia, proveedor_id: prov.id, items: [], total: int(300, 900) * 1000, estado: pick(['Borrador', 'Enviada', 'Parcial']), entrega: ymd(hoy + int(2, 15) * DAY) });

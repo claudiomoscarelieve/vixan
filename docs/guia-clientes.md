@@ -191,12 +191,55 @@ Más información en el [manual de WSASS de ARCA](https://www.afip.gob.ar/ws/WSA
 ### Facturar
 
 1. Revisá que cada cliente tenga su **condición frente al IVA** y su CUIT o DNI. Los pedidos de WooCommerce los traen solos del checkout; los de otros canales se cargan en **Clientes → Datos de clientes**. Si un cliente no tiene datos, se lo factura como Consumidor Final.
-2. En **Facturación → Pedidos a facturar**, tildá los pedidos y tocá **Facturar con ARCA**. La letra se elige sola: si sos Responsable Inscripto, A para Responsables Inscriptos y Monotributistas y B para el resto; si sos Monotributista o Exento, C.
-3. En **Comprobantes emitidos**, tocá **Imprimir** para ver la factura con el QR y guardarla como PDF.
+2. En **Facturación → Facturación**, elegí el período (o tocá **‹ Mes / Este mes / Mes ›**). Arriba hay seis tarjetas: sin facturar, facturado (con el % de lo facturable), facturable del período, notas de crédito, cancelados y lo emitido según ARCA. Tocar una tarjeta filtra la tabla.
+3. Tildá los pedidos y tocá **Facturar seleccionadas**, o **Facturar todo** para los pendientes del filtro. También podés usar **Emitir factura** en cada fila. La letra se elige sola: si sos Responsable Inscripto, A para Responsables Inscriptos y Monotributistas y B para el resto; si sos Monotributista o Exento, C.
+4. En **Comprobantes emitidos**, tocá **Imprimir** para ver la factura con el QR y guardarla como PDF.
 
-Para una venta sin pedido, usá **Factura manual** en Comprobantes emitidos.
+### Factura manual, notas de crédito y de débito
 
-Una factura autorizada no se puede borrar. Para anularla, usá **Anular (NC)**: emite una nota de crédito por el mismo importe.
+**Factura manual** (para una venta sin pedido): elegí el tipo de comprobante (factura con letra automática, nota de crédito o nota de débito), el cliente y los renglones. Cada renglón lleva **precio neto** (sin IVA), su **alícuota** (21 %, 10,5 %, 27 %, 5 %, 2,5 % o 0 %) e **impuestos internos** si corresponde. Los totales se calculan solos. No toca el stock.
+
+- Una **nota de débito** (por ejemplo, intereses por pago fuera de término) o una nota de crédito manual piden el **comprobante asociado** como punto de venta y número, por ejemplo `5-123`.
+- **Anular (NC)** en Comprobantes emitidos acepta un **importe**: si es menor al total, es una nota de crédito parcial (se reparte entre las alícuotas de la factura). Con **NC (resto)** se anula lo que falta. Cuando las notas de crédito cubren el total, la factura queda anulada.
+- **Manuales emitidas** lista las facturas manuales. **Traer de ARCA** recupera un comprobante que ARCA autorizó pero no quedó en Vixan (por ejemplo, si se cortó la conexión).
+- **Buscar comprobantes faltantes** revisa la numeración: huecos y números que ARCA autorizó después del último que tiene Vixan. Cada uno se puede traer con un clic.
+
+### Pedidos cancelados que ya tenían factura
+
+**Canceladas con factura** muestra los pedidos cancelados con factura vigente. Tildalos y tocá **Emitir NC** para anularlas. Si activás **Nota de crédito automática**, Vixan la emite sola cada vez que un pedido facturado pasa a cancelado.
+
+### Exportar facturas
+
+**Exportar facturas** baja lo emitido del mes o de un rango, en Excel, PDF o texto:
+- **Resumen**: un renglón por comprobante con neto e IVA al 21 %, 10,5 %, 27 % y otras alícuotas, no gravado, impuestos internos y total. Las notas de crédito van en negativo.
+- **Detalle**: un renglón por producto de cada comprobante.
+
+## Contabilidad
+
+**Finanzas → Contabilidad** arma los libros a partir de lo que ya está en Vixan: facturas, compras, Flujo de caja, cheques, préstamos y bienes de uso. Casi todas las pestañas tienen arriba el período (desde, hasta y los botones **‹ Mes / Este mes / Mes ›**) y se exportan a Excel o CSV. Revisá todo con tu contador antes de presentar una declaración jurada.
+
+**Lo primero: subir los datos de ARCA.** Cada mes, en ARCA → **Mis Comprobantes**, bajá **Emitidos** y **Recibidos** (CSV o Excel). Subilos en **Libro IVA Ventas** y **Libro IVA Compras** con el botón **Subir Mis Comprobantes**. Así entran las ventas que no pasaron por Vixan y las facturas de proveedores que no cargaste. Subir el mismo archivo dos veces no duplica nada.
+
+| Pestaña | Qué muestra y qué se hace |
+| --- | --- |
+| Resumen | IVA del mes, créditos de IIBB, ventas sin factura y si están cargados los datos de ARCA. **Lo que hay que hacer** lista los pendientes. **Reporte para el contador** arma una hoja para imprimir o guardar como PDF |
+| Posición mensual | Mes por mes: débito, crédito, saldo técnico y de libre disponibilidad que pasan al mes siguiente, percepciones y retenciones, IVA a pagar, impuestos internos e Ingresos Brutos |
+| Libro IVA Compras | Las órdenes de compra con datos de factura y lo que sólo está en ARCA. Por defecto el IVA se computa sólo con factura A, M o despacho (se cambia en Tipos de impuesto) |
+| Libro IVA Ventas | Las facturas de Vixan y las que sólo están en ARCA, con numeración y faltantes. Las facturas de prueba (homologación) no entran |
+| Libro diario | Los asientos automáticos (ventas, compras, gastos, cheques, préstamos, bienes de uso) y los **asientos manuales** (sueldos, pago de impuestos, apertura, ajustes) |
+| Mayor y saldos | Sumas y saldos de cada cuenta. Tocá una cuenta para ver su mayor con saldo inicial y final |
+| Balance | Activo, pasivo, patrimonio y resultado a una fecha, y si la ecuación contable cuadra |
+| Bienes de uso | Alta de cada bien (con su cuenta propia en el plan), amortización anual o mensual, venta o baja |
+| Bancos | Subí el extracto del home banking; Vixan sugiere con qué coincide cada movimiento y concilia de una vez los de coincidencia alta |
+| Cheques | Recibidos (en cartera, depositados, endosados, cobrados, rechazados) y emitidos; vencimientos de la semana y del mes |
+| Préstamos | Simulación de cuotas (sistema francés o alemán, IVA sobre intereses, otros cargos), deuda de corto y largo plazo y pago de cada cuota |
+| Provincias | Ventas por provincia para Ingresos Brutos (Convenio Multilateral). Cargá la alícuota de cada provincia para ver el estimado |
+| Plan de cuentas | El plan modelo de Vixan o el tuyo: crear, renombrar o desactivar cuentas, y elegir a qué cuenta va cada asiento automático, cada categoría de gasto y cada proveedor que sólo está en ARCA |
+| Tipos de impuesto | Cómo se trata cada impuesto y en qué mes entra una factura de compra |
+
+**Para que las compras entren al Libro IVA Compras**, completá los datos de la factura en **Reabastecimiento → Compras recibidas**: tipo de comprobante, fecha, punto de venta, número, CUIT del proveedor, netos por alícuota, exento, percepciones y otros tributos. Una orden sin esos datos no entra al libro ni al diario (el Resumen avisa cuántas faltan).
+
+**Archivos para IVA Simple**: en cualquiera de los dos libros, **Archivos para IVA Simple** baja un .zip con los cuatro archivos del Libro IVA Digital del mes (comprobantes y alícuotas de ventas y de compras) para importar en ARCA.
 
 ## Módulos del menú
 
@@ -220,12 +263,12 @@ Los módulos están agrupados como en el menú de la izquierda; con el buscador 
 | Compras | Reabastecimiento | Órdenes de compra y facturas de compra recibidas |
 | Compras | Proveedores | Proveedores, marcas y fabricantes, y qué proveedor abastece cada marca |
 | Compras | CC proveedores | Cuánto le debés a cada proveedor, vencimientos y calendario de pagos |
-| Finanzas | Facturación | Facturas A, B y C con CAE de ARCA, notas de crédito e impresión con QR |
+| Finanzas | Facturación | Facturas A, B y C con CAE de ARCA, factura manual con varias alícuotas, notas de crédito y débito, faltantes, exportación e impresión con QR |
 | Finanzas | Resultados | Ganancia real por pedido y por plataforma, descontando todos los costos |
 | Finanzas | Cuenta corriente | Servicios logísticos a facturar y cobros en efectivo a rendir |
 | Finanzas | Flujo de caja | Gastos, ingresos, cobranzas, deudores y cuentas bancarias |
 | Finanzas | Impuestos | Retenciones, percepciones e IVA |
-| Finanzas | Contabilidad | Posición de IVA, libros de compras y ventas, plan de cuentas |
+| Finanzas | Contabilidad | Posición de IVA, libros IVA con datos de ARCA, libro diario, mayor, balance, bienes de uso, bancos, cheques, préstamos, IIBB por provincia y plan de cuentas |
 | Finanzas | Auditoría | Pedidos cancelados después de despachados: aprobar devuelve el stock |
 | Clientes y canales | Clientes | Cartera (cuánto y cada cuánto compra cada uno) y datos de contacto |
 | Clientes y canales | Integraciones | Conexión con Mercado Libre y WooCommerce: productos, pedidos, clientes y stock |

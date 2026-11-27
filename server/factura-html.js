@@ -12,7 +12,7 @@ async function facturaHTML(t, id) {
   const f = store.get(t, 'facturas', id);
   if (!f) throw new Error('No existe');
   const em = store.getSettings(t).facturacion || {};
-  const letra = String(f.tipo || 'B').replace('NC ', '');
+  const letra = String(f.tipo || 'B').replace(/^(NC|ND) /, '');
   const esNC = String(f.tipo).startsWith('NC');
   let qr = '';
   if (f.cae) {
@@ -20,10 +20,21 @@ async function facturaHTML(t, id) {
     const url = 'https://www.afip.gob.ar/fe/qr/?p=' + Buffer.from(JSON.stringify(datos)).toString('base64');
     qr = await QRCode.toString(url, { type: 'svg', margin: 0, width: 110 });
   }
-  const items = (f.items && f.items.length ? f.items : [{ nombre: esNC ? `Anulación de ${f.asociada}` : 'Venta', cantidad: 1, precio: f.total }]);
+  const esND = String(f.tipo).startsWith('ND');
   const discrimina = letra === 'A';
-  const factor = discrimina ? 1 + (f.alicuota || 21) / 100 : 1;
-  const filas = items.map((i) => `<tr><td>${esc(i.sku || '')}</td><td>${esc(i.nombre)}</td><td class="n">${i.cantidad}</td><td class="n">${money(i.precio / factor)}</td>${discrimina ? `<td class="n">${f.alicuota || 21}%</td>` : ''}<td class="n">${money((i.precio * i.cantidad) / factor)}</td></tr>`).join('');
+  const alics = f.alicuotas && f.alicuotas.length ? f.alicuotas : (letra === 'C' ? [] : [{ alic: f.alicuota || 21, neto: f.neto, iva: f.iva }]);
+  // Ítems nuevos: precio neto por unidad, alícuota e impuestos internos por línea. Los anteriores: precio con IVA incluido.
+  const lista = f.items && f.items.length ? f.items : [{ nombre: esNC ? `Anulación de ${f.asociada}` : esND ? `Ajuste de ${f.asociada}` : 'Venta', cantidad: 1, neto: letra === 'C' ? f.total - (f.imp_internos || 0) : f.neto, alicuota: alics.length === 1 ? alics[0].alic : null, imp_int: 0 }];
+  const filas = lista.map((i) => {
+    const cant = Number(i.cantidad) || 0;
+    const nuevo = i.neto !== undefined;
+    const alic = nuevo ? Number(i.alicuota ?? (alics[0]?.alic ?? 21)) : (f.alicuota || 21);
+    const netoU = nuevo ? Number(i.neto) : Number(i.precio) / (1 + alic / 100);
+    const ivaU = letra === 'C' ? 0 : netoU * alic / 100;
+    const ii = Number(i.imp_int || 0);
+    const unit = discrimina ? netoU : netoU + ivaU + ii;
+    return `<tr><td>${esc(i.sku || '')}</td><td>${esc(i.nombre)}</td><td class="n">${cant}</td><td class="n">${money(unit)}</td>${discrimina ? `<td class="n">${letra === 'C' ? '' : alic + '%'}</td>` : ''}<td class="n">${money(unit * cant)}</td></tr>`;
+  }).join('');
   const cond = COND_IVA_NOMBRE[f.cond_iva_receptor] || 'Consumidor Final';
   const leyendas = [];
   if (f.cond_iva_receptor === 5) leyendas.push('A CONSUMIDOR FINAL');
@@ -52,7 +63,7 @@ async function facturaHTML(t, id) {
     <div class="cab">
       <div><h1>${esc(em.razon_social || '')}</h1><div><b>Domicilio:</b> ${esc(em.domicilio || '')}</div><div><b>Condición frente al IVA:</b> ${esc(em.condicion_iva || '')}</div></div>
       <div class="letra"><b>${letra}</b><small>COD. ${String(f.cbte_tipo || '').padStart(2, '0')}</small></div>
-      <div><h2>${esNC ? 'NOTA DE CRÉDITO' : 'FACTURA'}</h2>
+      <div><h2>${esNC ? 'NOTA DE CRÉDITO' : esND ? 'NOTA DE DÉBITO' : 'FACTURA'}</h2>
         <div><b>Punto de venta:</b> ${String(f.punto_venta || '').padStart(5, '0')} &nbsp; <b>Comp. Nro:</b> ${String(f.nro || '').padStart(8, '0')}</div>
         <div><b>Fecha de emisión:</b> ${fecha(f.fecha)}</div><div><b>CUIT:</b> ${esc(em.cuit || '')}</div>
         <div><b>Ingresos Brutos:</b> ${esc(em.iibb || em.cuit || '')}</div><div><b>Inicio de actividades:</b> ${fecha(em.inicio_act)}</div></div>
@@ -60,12 +71,13 @@ async function facturaHTML(t, id) {
     <div class="rec">
       <div><b>${DOC[f.doc_tipo] || 'Doc.'}:</b> ${f.doc_tipo === 99 ? '—' : esc(f.doc_nro)}</div><div><b>Apellido y nombre / Razón social:</b> ${esc(f.cliente || '')}</div>
       <div><b>Condición frente al IVA:</b> ${esc(cond)}</div><div><b>Domicilio:</b> ${esc(f.domicilio || '')}</div>
-      ${f.asociada ? `<div style="grid-column:span 2"><b>Comprobante asociado:</b> Factura ${esc(letra)} ${esc(f.asociada)}${f.motivo ? ' — ' + esc(f.motivo) : ''}</div>` : ''}
+      ${f.asociada ? `<div style="grid-column:span 2"><b>Comprobante asociado:</b> ${esc(f.asociada)}${f.motivo ? ' — ' + esc(f.motivo) : ''}</div>` : ''}
       ${f.pedido ? `<div><b>Pedido:</b> ${esc(f.pedido)}</div>` : ''}<div><b>Condición de venta:</b> Contado</div>
     </div>
     <table><thead><tr><th>Código</th><th>Producto / Servicio</th><th class="n">Cant.</th><th class="n">Precio unit.</th>${discrimina ? '<th class="n">IVA</th>' : ''}<th class="n">Subtotal</th></tr></thead><tbody>${filas}</tbody></table>
     <div class="tot"><table>
-      ${discrimina ? `<tr><td>Importe neto gravado</td><td class="n">${money(f.neto)}</td></tr><tr><td>IVA ${f.alicuota || 21}%</td><td class="n">${money(f.iva)}</td></tr>` : ''}
+      ${discrimina ? `<tr><td>Importe neto gravado</td><td class="n">${money(f.neto)}</td></tr>${alics.map((g) => `<tr><td>IVA ${g.alic}%</td><td class="n">${money(g.iva)}</td></tr>`).join('')}` : ''}
+      ${f.imp_internos ? `<tr><td>Impuestos internos</td><td class="n">${money(f.imp_internos)}</td></tr>` : ''}
       <tr><td>Importe total</td><td class="n">${money(f.total)}</td></tr></table></div>
     ${letra === 'B' ? `<div class="ley"><b>Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</b> — IVA contenido: ${money(f.iva)}</div>` : ''}
     ${leyendas.map((l) => `<div class="ley">${esc(l)}</div>`).join('')}

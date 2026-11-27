@@ -7,6 +7,8 @@ const logic = require('./logic');
 const { integrar } = require('./integrations');
 const woo = require('./woo');
 const catalogo = require('./catalogo');
+const facturacion = require('./facturacion');
+const contabilidad = require('./contab-rutas');
 const arca = require('./arca');
 const tienda = require('./tienda');
 const { facturaHTML } = require('./factura-html');
@@ -321,7 +323,9 @@ app.post('/api/arca/certificado', soloAdmin, aWrap((req) => arca.guardarCertific
 app.post('/api/arca/probar', soloAdmin, aWrap((req) => arca.probar(req.tenantId)));
 app.post('/api/arca/facturar-pedidos', aWrap((req) => arca.facturarPedidos(req.tenantId, (req.body.ids || []).map(Number))));
 app.post('/api/arca/factura-manual', aWrap((req) => arca.facturaManual(req.tenantId, req.body || {})));
-app.post('/api/arca/facturas/:id/nota-credito', aWrap((req) => arca.notaCredito(req.tenantId, req.params.id, req.body.motivo)));
+app.post('/api/arca/facturas/:id/nota-credito', aWrap((req) => arca.notaCredito(req.tenantId, req.params.id, req.body.motivo, req.body.monto)));
+app.use('/api/facturacion', facturacion.router);
+app.use('/api/contabilidad', contabilidad.router);
 app.get('/api/arca/facturas/:id/imprimir', async (req, res) => {
   try { res.type('html').send(await facturaHTML(req.tenantId, req.params.id)); } catch (e) { res.status(404).send(e.message); }
 });
