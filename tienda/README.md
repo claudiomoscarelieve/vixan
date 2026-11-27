@@ -2,7 +2,7 @@
 
 Vidriera de e-commerce de cada cliente de Vixan. Se instala en el **servidor propio del cliente** y toma catálogo, precios y stock de Vixan (servidor central multicliente).
 
-> Versión 0.4.0: plantilla completa conectada al catálogo de Vixan. El checkout con Mercado Pago y las cuentas de clientes llegan en las próximas etapas.
+> Versión 0.5.0: plantilla completa conectada al catálogo de Vixan, con cuentas de compradores (registro con aprobación y precio según la lista de cada cliente). El checkout con Mercado Pago llega en una próxima etapa.
 
 ## Probarla
 
@@ -26,7 +26,7 @@ Copiá `config.ejemplo.json` como `config.json` (no se sube al repositorio porqu
 | `compra` | Textos de la ficha de producto: modalidad, disponibilidad, aviso de últimas unidades, pagos, envíos y despacho, devolución y términos |
 | `contacto` | WhatsApp (solo números, con código de país), mensaje inicial, email, dirección y horario |
 | `paginas.mayoristas` | Texto de la página "Cómo comprar" |
-| `fuente` / `vixan` | `demo` (catálogo de ejemplo) o `vixan` (catálogo publicado del cliente). Con `vixan`, la URL de Vixan va en `vixan.url` y la clave de la tienda en la variable `VIXAN_TIENDA_CLAVE` |
+| `fuente` / `vixan` | `demo` (catálogo de ejemplo) o `vixan` (catálogo publicado del cliente). Con `vixan`, la URL de Vixan va en `vixan.url`, el ID público de la tienda (Mi tienda) en `vixan.tienda` para habilitar las cuentas de compradores, y la clave de la tienda en la variable `VIXAN_TIENDA_CLAVE` |
 
 ## Estructura de la plantilla
 

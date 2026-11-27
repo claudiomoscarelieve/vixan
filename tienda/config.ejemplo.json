@@ -1,13 +1,12 @@
 {
   "_ayuda": "Copiá este archivo como config.json y cambiá los valores. Los colores aceptan cualquier color CSS.",
   "puerto": 3100,
-
   "fuente": "demo",
   "vixan": {
     "url": "https://app.vixan.com.ar",
-    "clave": "PEGAR-AQUI-LA-CLAVE-DE-API-DEL-CLIENTE"
+    "clave": "PEGAR-AQUI-LA-CLAVE-DE-API-DEL-CLIENTE",
+    "tienda": ""
   },
-
   "_ftp": "Solo para la versión estática (hosting PHP): node publicar.js. La contraseña va en la variable VIXAN_FTP_CLAVE.",
   "ftp": {
     "host": "ftp.tutiendaconia.com.ar",
@@ -16,7 +15,6 @@
     "carpeta": "/public_html",
     "seguro": true
   },
-
   "tienda": {
     "nombre": "Tu Marca",
     "url": "https://www.tumarca.com.ar",
@@ -26,9 +24,11 @@
     "precioConIva": false,
     "preciosSoloClientes": false,
     "compraMinimaInicial": 500000,
-    "descuentoPorVolumen": { "desde": 1000000, "porcentaje": 10 }
+    "descuentoPorVolumen": {
+      "desde": 1000000,
+      "porcentaje": 10
+    }
   },
-
   "tema": {
     "primario": "#0F253C",
     "acento": "#1FB1A4",
@@ -38,34 +38,50 @@
     "tipografia": "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
     "radio": "10px"
   },
-
   "avisos": [
     "10% OFF en compras desde $1.000.000",
     "Compra inicial $500.000 + IVA",
     "Reposición sin mínimo",
     "Envíos a todo el país"
   ],
-
   "banners": [
-    { "titulo": "10% OFF", "texto": "En compras desde $1.000.000", "enlace": "/ofertas", "imagen": "" },
-    { "titulo": "Primera compra $500.000 + IVA", "texto": "Después reponé sin mínimo", "enlace": "/mayoristas", "imagen": "" }
+    {
+      "titulo": "10% OFF",
+      "texto": "En compras desde $1.000.000",
+      "enlace": "/ofertas",
+      "imagen": ""
+    },
+    {
+      "titulo": "Primera compra $500.000 + IVA",
+      "texto": "Después reponé sin mínimo",
+      "enlace": "/mayoristas",
+      "imagen": ""
+    }
   ],
-
   "bloquesOfertas": [
     {
       "titulo": "Ofertas para tu negocio",
       "texto": "Precios especiales por tiempo limitado.",
       "categoria": "",
-      "banner": { "titulo": "Bazar para tu local", "texto": "Todo para equipar tu negocio", "enlace": "/c/bazar", "imagen": "" }
+      "banner": {
+        "titulo": "Bazar para tu local",
+        "texto": "Todo para equipar tu negocio",
+        "enlace": "/c/bazar",
+        "imagen": ""
+      }
     },
     {
       "titulo": "Lo más pedido",
       "texto": "Los productos que más reponen nuestros clientes.",
       "categoria": "",
-      "banner": { "titulo": "Novedades", "texto": "Mirá lo último que llegó", "enlace": "/novedades", "imagen": "" }
+      "banner": {
+        "titulo": "Novedades",
+        "texto": "Mirá lo último que llegó",
+        "enlace": "/novedades",
+        "imagen": ""
+      }
     }
   ],
-
   "compra": {
     "modalidad": "Venta mayorista",
     "modalidadDetalle": "Venta exclusiva a comercios y revendedores mayoristas",
@@ -79,7 +95,6 @@
     "terminos": "/mayoristas#terminos",
     "textoTerminos": "Los cambios y devoluciones se aceptan dentro de los 30 días de recibida la mercadería, en su embalaje original. Los precios pueden cambiar sin previo aviso."
   },
-
   "contacto": {
     "whatsapp": "5493564000000",
     "mensajeWhatsapp": "Hola, quiero hacer una consulta mayorista.",
@@ -87,7 +102,6 @@
     "direccion": "Calle 123, Ciudad, Provincia",
     "horario": "Lunes a viernes de 9 a 18 h"
   },
-
   "paginas": {
     "mayoristas": "Vendemos exclusivamente por mayor. La primera compra tiene un mínimo; después podés reponer sin mínimo. Los precios no incluyen IVA."
   }

@@ -2,7 +2,8 @@
   "puerto": 3100,
   "fuente": "vixan",
   "vixan": {
-    "url": "https://app.vixan.com.ar"
+    "url": "https://app.vixan.com.ar",
+    "tienda": ""
   },
   "_ftp": "Solo para la versión estática (hosting PHP): node publicar.js. La contraseña va en la variable VIXAN_FTP_CLAVE.",
   "ftp": {

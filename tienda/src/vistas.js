@@ -62,6 +62,8 @@ function layout(cfg, fuente, { titulo, descripcion, cuerpo, actual = '', cabeza 
   const publico = {
     whatsapp: wa || '', mensajeWhatsapp: cfg.contacto?.mensajeWhatsapp || '', nombre: t.nombre,
     precioConIva: !!t.precioConIva, compraMinimaInicial: t.compraMinimaInicial || 0, descuentoPorVolumen: t.descuentoPorVolumen || null,
+    // Cuentas de compradores: la tienda habla con Vixan desde el navegador (ID público, no es secreto)
+    cuentas: cfg.vixan?.url && cfg.vixan?.tienda ? `${String(cfg.vixan.url).replace(/\/$/, '')}/api/v1/tienda/publico/${encodeURIComponent(cfg.vixan.tienda)}` : '',
   };
   return `<!doctype html><html lang="es-AR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulo ? `${titulo} · ${t.nombre}` : t.nombre)}</title>
@@ -290,11 +292,98 @@ function mayoristas(cfg, fuente) {
 }
 
 function cuenta(cfg, fuente) {
+  const wa = cfg.contacto?.whatsapp;
+  const conectada = cfg.vixan?.url && cfg.vixan?.tienda;
+  const provincias = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'];
+  const campo = (nombre, etiqueta, attrs = '', ancho = '') => `<label class="${ancho}">${etiqueta}<input name="${nombre}" ${attrs}></label>`;
   return layout(cfg, fuente, {
-    titulo: 'Ingresar',
-    cuerpo: `<div class="envoltura pagina angosta">${migas([['Mi cuenta']])}<h1>Ingresar</h1>
-  <form class="form-cuenta" onsubmit="return false"><label>Email<input type="email" autocomplete="email" disabled></label><label>Contraseña<input type="password" autocomplete="current-password" disabled></label>
-  <button class="btn" disabled>Ingresar</button><p class="nota">Las cuentas de clientes se conectan con Vixan en una próxima etapa. Mientras tanto, podés armar tu pedido y enviarlo por WhatsApp.</p></form></div>`,
+    titulo: 'Mi cuenta',
+    cuerpo: `<div class="envoltura pagina angosta cuenta-app" data-cuenta-app>${migas([['Mi cuenta']])}
+  ${conectada ? '' : '<p class="nota">Las cuentas de clientes todavía no están activas en esta tienda. Mientras tanto, podés armar tu pedido y enviarlo por WhatsApp.</p>'}
+  <section data-vista="ingresar"${conectada ? '' : ' hidden'}>
+    <h1>Ingresar</h1><p class="bajada">Ingresá para ver tus precios y armar tu pedido.</p>
+    <form class="form-cuenta" data-form="ingresar">
+      ${campo('email', 'Email', 'type="email" autocomplete="email" required')}
+      ${campo('password', 'Contraseña', 'type="password" autocomplete="current-password" required')}
+      <button class="btn">Ingresar</button><p class="form-error" data-error hidden></p>
+      <p class="enlaces"><a href="#olvide">¿Olvidaste tu contraseña?</a></p>
+    </form>
+    <div class="caja-registro"><b>¿Todavía no tenés cuenta?</b><span>Registrá tu comercio: revisamos los datos y te avisamos por email cuando esté aprobada.</span><a class="btn btn-sec" href="#registro">Crear cuenta</a></div>
+  </section>
+
+  <section data-vista="registro" hidden>
+    <h1>Crear cuenta</h1><p class="bajada">Venta exclusiva a comercios. Completá los datos de tu negocio: la cuenta queda pendiente hasta que la aprobemos.</p>
+    <form class="form-cuenta ancho" data-form="registro">
+      <fieldset><legend>Tu comercio</legend><div class="form-grilla">
+        ${campo('razon_social', 'Razón social o nombre del comercio', 'required autocomplete="organization"', 'doble')}
+        ${campo('cuit', 'CUIT', 'required inputmode="numeric" placeholder="20-12345678-9"')}
+        <label>Condición frente al IVA<select name="condicion_iva"><option>Responsable Inscripto</option><option>Monotributista</option><option>Exento</option><option>Consumidor Final</option></select></label>
+        ${campo('rubro', 'Rubro (opcional)', 'placeholder="Bazar, regalería, ferretería…"', 'doble')}
+      </div></fieldset>
+      <fieldset><legend>Contacto</legend><div class="form-grilla">
+        ${campo('nombre', 'Tu nombre y apellido', 'required autocomplete="name"')}
+        ${campo('telefono', 'Teléfono / WhatsApp', 'required type="tel" autocomplete="tel"')}
+        ${campo('email', 'Email', 'required type="email" autocomplete="email"', 'doble')}
+      </div></fieldset>
+      <fieldset><legend>Dirección</legend><div class="form-grilla">
+        ${campo('direccion', 'Calle y número', 'autocomplete="street-address"', 'doble')}
+        ${campo('localidad', 'Localidad', 'autocomplete="address-level2"')}
+        <label>Provincia<select name="provincia"><option value="">Elegí</option>${provincias.map((p) => `<option>${p}</option>`).join('')}</select></label>
+        ${campo('cp', 'Código postal', 'autocomplete="postal-code" inputmode="numeric"')}
+      </div></fieldset>
+      <fieldset><legend>Contraseña</legend><div class="form-grilla">
+        ${campo('password', 'Contraseña (mínimo 8 caracteres)', 'required type="password" minlength="8" autocomplete="new-password"')}
+        ${campo('password2', 'Repetí la contraseña', 'required type="password" minlength="8" autocomplete="new-password"')}
+      </div></fieldset>
+      <button class="btn">Crear cuenta</button><p class="form-error" data-error hidden></p>
+      <p class="enlaces"><a href="#ingresar">Ya tengo cuenta</a></p>
+    </form>
+  </section>
+
+  <section data-vista="registrada" hidden>
+    <h1>¡Gracias por registrarte!</h1>
+    <p>Recibimos los datos de tu comercio. Tu cuenta queda <b>pendiente de aprobación</b>: te avisamos por email cuando esté lista para ingresar.</p>
+    ${wa ? `<p>¿Necesitás algo antes? <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">Escribinos por WhatsApp</a>.</p>` : ''}
+    <a class="btn" href="/catalogo">Ver el catálogo</a>
+  </section>
+
+  <section data-vista="olvide" hidden>
+    <h1>Recuperar contraseña</h1><p class="bajada">Te enviamos un enlace por email para elegir una contraseña nueva.</p>
+    <form class="form-cuenta" data-form="olvide">
+      ${campo('email', 'Email de tu cuenta', 'type="email" autocomplete="email" required')}
+      <button class="btn">Enviar enlace</button><p class="form-error" data-error hidden></p><p class="form-ok" data-ok hidden></p>
+      <p class="enlaces"><a href="#ingresar">Volver a ingresar</a></p>
+    </form>
+  </section>
+
+  <section data-vista="restablecer" hidden>
+    <h1>Elegí una contraseña nueva</h1>
+    <form class="form-cuenta" data-form="restablecer">
+      ${campo('password', 'Contraseña nueva (mínimo 8 caracteres)', 'type="password" minlength="8" autocomplete="new-password" required')}
+      ${campo('password2', 'Repetila', 'type="password" minlength="8" autocomplete="new-password" required')}
+      <button class="btn">Guardar contraseña</button><p class="form-error" data-error hidden></p><p class="form-ok" data-ok hidden></p>
+    </form>
+  </section>
+
+  <section data-vista="mi-cuenta" hidden>
+    <h1>Hola, <span data-dato="nombre"></span></h1>
+    <div class="cuenta-resumen">
+      <div><span>Comercio</span><b data-dato="razon_social"></b></div>
+      <div><span>CUIT</span><b data-dato="cuit"></b></div>
+      <div><span>Email</span><b data-dato="email"></b></div>
+      <div><span>Tus precios</span><b data-dato="lista"></b></div>
+    </div>
+    <p>Ya ves tus precios en toda la tienda. Armá tu pedido y envialo desde <a href="#" data-abrir="pedido">Mi pedido</a>.</p>
+    <details class="cambiar-clave"><summary>Cambiar contraseña</summary>
+      <form class="form-cuenta" data-form="clave">
+        ${campo('actual', 'Contraseña actual', 'type="password" autocomplete="current-password" required')}
+        ${campo('nueva', 'Contraseña nueva (mínimo 8 caracteres)', 'type="password" minlength="8" autocomplete="new-password" required')}
+        <button class="btn btn-sec">Cambiar contraseña</button><p class="form-error" data-error hidden></p><p class="form-ok" data-ok hidden></p>
+      </form>
+    </details>
+    <div class="toolbar-cuenta"><a class="btn" href="/catalogo">Ver el catálogo</a><button class="btn btn-sec" type="button" data-salir>Salir</button></div>
+  </section>
+</div>`,
   });
 }
 

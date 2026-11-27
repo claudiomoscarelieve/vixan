@@ -81,7 +81,8 @@
   function enviarWhatsapp() {
     const t = totales();
     const lineas = pedido.map((i) => `• ${i.cant} × ${i.nombre} (${i.sku}) — ${pesos(i.precio * i.cant)}`);
-    const txt = [`Hola ${T.nombre}, quiero hacer este pedido:`, '', ...lineas, '', `Subtotal: ${pesos(t.sub)}`,
+    const cli = cuenta ? [`Cliente: ${cuenta.razon_social} · CUIT ${cuenta.cuit}`, ''] : [];
+    const txt = [`Hola ${T.nombre}, quiero hacer este pedido:`, '', ...cli, ...lineas, '', `Subtotal: ${pesos(t.sub)}`,
       ...(t.desc ? [`Descuento: −${pesos(t.desc)}`] : []), ...(t.iva ? [`IVA: ${pesos(t.iva)}`] : []), `Total: ${pesos(t.total)}`].join('\n');
     window.open(`https://wa.me/${T.whatsapp}?text=${encodeURIComponent(txt)}`, '_blank', 'noopener');
   }
@@ -103,6 +104,7 @@
   }
 
   function pintar() {
+    aplicarPrecios();
     const c1 = $('[data-cont="pedido"]'), c2 = $('[data-cont="favoritos"]');
     c1.textContent = c1.dataset.n = pedido.length; c2.textContent = c2.dataset.n = favoritos.length;
     $$('[data-fav]').forEach((b) => b.classList.toggle('activo', esFav(Number(b.dataset.fav))));
@@ -257,6 +259,145 @@
       $('[data-sin-resultados]').hidden = r.length > 0;
       pintar();
     }).catch(() => { $('[data-sin-resultados]').hidden = false; });
+  }
+
+
+  // ---------- Cuentas de compradores (login con Vixan) ----------
+  // La sesión es un token guardado en este navegador. Con la sesión, la tienda pide a Vixan los precios
+  // de la lista del cliente y los reemplaza en todas las páginas y en el pedido.
+  let cuenta = null; let preciosCliente = null; let listaCliente = '';
+  const SESION = 'vt_sesion';
+  const leerSesion = () => { try { return localStorage.getItem(SESION) || ''; } catch { return memoria.sesion || ''; } };
+  const guardarSesion = (v) => { memoria.sesion = v; try { v ? localStorage.setItem(SESION, v) : localStorage.removeItem(SESION); sessionStorage.removeItem('vt_yo'); } catch { /* sin almacenamiento */ } };
+
+  async function api(ruta, datos) {
+    const token = leerSesion();
+    const r = await fetch(T.cuentas + ruta, {
+      method: datos ? 'POST' : 'GET',
+      headers: { ...(datos ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: datos ? JSON.stringify(datos) : undefined,
+    });
+    const j = await r.json().catch(() => ({ ok: false, error: 'No pudimos conectarnos. Probá de nuevo.' }));
+    if (!j.ok) throw Object.assign(new Error(j.error || 'Ocurrió un error'), { status: r.status, codigo: j.codigo });
+    return j.data;
+  }
+
+  function aplicarSesion(d) {
+    cuenta = d.cuenta; preciosCliente = d.precios || {}; listaCliente = d.lista || '';
+    try { sessionStorage.setItem('vt_yo', JSON.stringify({ t: Date.now(), d })); } catch { /* sin almacenamiento */ }
+    const btn = $('.cab-der a[href="/cuenta"] span');
+    if (btn) btn.textContent = (cuenta.nombre || 'Mi cuenta').split(' ')[0];
+    // El pedido guardado pasa a los precios del cliente
+    let cambio = false;
+    pedido.forEach((i) => { const p = preciosCliente[i.id]; if (p && p !== i.precio) { i.precio = p; cambio = true; } });
+    if (cambio) guardar('pedido', pedido);
+    document.documentElement.classList.add('con-cuenta');
+    pintar();
+  }
+
+  // Reemplaza los precios visibles por los de la lista del cliente
+  function aplicarPrecios() {
+    if (!preciosCliente) return;
+    $$('[data-prod]').forEach((el) => {
+      if (el.dataset.precioCliente) return;
+      const d = JSON.parse(el.dataset.prod); const p = preciosCliente[d.id];
+      el.dataset.precioCliente = '1';
+      const caja = el.querySelector('.prod-precio');
+      if (!p) { // el producto no tiene precio en la lista del cliente
+        if (caja) caja.innerHTML = '<b class="consultar">Consultar precio</b>';
+        el.querySelectorAll('[data-agregar]').forEach((b) => { b.disabled = true; b.textContent = 'Consultar'; });
+        return;
+      }
+      d.precio = p; el.dataset.prod = JSON.stringify(d);
+      if (caja) {
+        const b = caja.querySelector('b'); if (b) b.textContent = pesos(p);
+        const tachado = caja.querySelector('s');
+        if (tachado) { const ant = Number(tachado.textContent.replace(/\D/g, '')); if (ant <= p) tachado.remove(); }
+      }
+      const oferta = el.querySelector('.badge.oferta'); const t2 = caja?.querySelector('s');
+      if (oferta) { if (t2) oferta.textContent = `-${Math.round((1 - p / Number(t2.textContent.replace(/\D/g, ''))) * 100)}%`; else oferta.remove(); }
+      const bulto = el.querySelector('.precio-bulto b'); if (bulto) bulto.textContent = pesos(p * (d.multiplo || 1));
+    });
+    const barra = $('[data-barra-compra] b'); const ficha = $('.ficha[data-prod]');
+    if (barra && ficha) { const p = preciosCliente[JSON.parse(ficha.dataset.prod).id]; barra.textContent = p ? pesos(p) : 'Consultar'; }
+  }
+
+  async function cargarSesion() {
+    if (!T.cuentas || !leerSesion()) return;
+    try {
+      const guardada = JSON.parse(sessionStorage.getItem('vt_yo') || 'null');
+      if (guardada && Date.now() - guardada.t < 5 * 60000) return aplicarSesion(guardada.d);
+    } catch { /* sin copia */ }
+    try { aplicarSesion(await api('/yo')); } catch (e) { if (e.status === 401) guardarSesion(''); }
+  }
+
+  // ---------- Página Mi cuenta ----------
+  const app = $('[data-cuenta-app]');
+  if (app && T.cuentas) {
+    const vistas = $$('[data-vista]', app);
+    const ver = (v) => { vistas.forEach((s) => { s.hidden = s.dataset.vista !== v; }); window.scrollTo(0, 0); };
+    const params = new URLSearchParams(location.search);
+    const restablecer = params.get('restablecer');
+    const rutear = () => {
+      if (restablecer) return ver('restablecer');
+      const h = location.hash.slice(1);
+      if (cuenta) return ver('mi-cuenta');
+      ver(['registro', 'olvide'].includes(h) ? h : 'ingresar');
+    };
+    window.addEventListener('hashchange', rutear);
+
+    const mostrarCuenta = () => {
+      $$('[data-dato]', app).forEach((x) => { x.textContent = x.dataset.dato === 'lista' ? listaCliente : (cuenta[x.dataset.dato] || ''); });
+      if (x0) x0.textContent = (cuenta.nombre || '').split(' ')[0];
+      ver('mi-cuenta');
+    };
+    const x0 = $('[data-dato="nombre"]', app);
+
+    const enviarForm = (nombre, accion) => {
+      const f = $(`[data-form="${nombre}"]`, app); if (!f) return;
+      f.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const err = $('[data-error]', f); const ok = $('[data-ok]', f); const btn = $('button', f);
+        err.hidden = true; if (ok) ok.hidden = true;
+        const datos = Object.fromEntries(new FormData(f));
+        const texto = btn.textContent; btn.disabled = true; btn.textContent = 'Un momento…';
+        try { await accion(datos, f, ok); } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+        btn.disabled = false; btn.textContent = texto;
+      });
+    };
+    enviarForm('ingresar', async (d) => {
+      const r = await api('/ingreso', { email: d.email, password: d.password });
+      guardarSesion(r.token); aplicarSesion(r); mostrarCuenta();
+      aviso(`¡Hola, ${(r.cuenta.nombre || '').split(' ')[0]}! Ya ves tus precios.`);
+    });
+    enviarForm('registro', async (d) => {
+      if (d.password !== d.password2) throw new Error('Las contraseñas no coinciden');
+      delete d.password2;
+      await api('/registro', d);
+      ver('registrada');
+    });
+    enviarForm('olvide', async (d, f, ok) => {
+      await api('/olvide', { email: d.email });
+      ok.textContent = 'Si el email tiene una cuenta, te llega un enlace en unos minutos. Revisá también el correo no deseado.'; ok.hidden = false;
+    });
+    enviarForm('restablecer', async (d, f, ok) => {
+      if (d.password !== d.password2) throw new Error('Las contraseñas no coinciden');
+      await api('/restablecer', { token: restablecer, password: d.password });
+      history.replaceState(null, '', '/cuenta/#ingresar');
+      ok.textContent = 'Listo: ya podés ingresar con tu contraseña nueva.'; ok.hidden = false;
+      setTimeout(() => location.reload(), 1800);
+    });
+    enviarForm('clave', async (d, f, ok) => {
+      await api('/clave', { actual: d.actual, nueva: d.nueva });
+      f.reset(); ok.textContent = 'Contraseña cambiada.'; ok.hidden = false;
+    });
+    $('[data-salir]', app).addEventListener('click', async () => {
+      try { await api('/salir', {}); } catch { /* igual se cierra */ }
+      guardarSesion(''); location.href = '/';
+    });
+    cargarSesion().then(() => { if (cuenta && !restablecer) mostrarCuenta(); else rutear(); });
+  } else {
+    cargarSesion();
   }
 
   pintar();

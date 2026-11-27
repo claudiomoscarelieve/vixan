@@ -118,6 +118,20 @@ Si tenés tienda online de Vixan, muestra los productos que marcás para publica
 - **Lista de precios**: en **Vixan Market → Mi tienda**. Ahí también ves cuántos productos están publicados y **Ver qué publica** muestra la lista exacta.
 - **Ocultar productos** sin desmarcarlos: cargá sus SKU en **SKUs que no se muestran en la tienda**.
 
+### Compradores con cuenta
+
+Los comercios se registran en la tienda (**Ingresar → Crear cuenta**) con su razón social, CUIT, contacto y dirección. La cuenta queda **pendiente** hasta que la apruebes.
+
+- En **Vixan Market → Compradores** ves las cuentas, las pendientes primero. Elegí la **lista de precios** de cada comprador y tocá **Aprobar**: le llega un email y, cuando ingresa, la tienda le muestra los precios de esa lista en todas las páginas y en su pedido. Los productos sin precio en su lista le aparecen como "Consultar precio".
+- Los visitantes sin cuenta ven el precio de la lista de la tienda (Mi tienda → Lista de precios).
+- Cada cuenta queda vinculada a un cliente de **Clientes** (se busca por CUIT o email; si no existe, se crea con la etiqueta Tienda).
+- **Rechazar** o **Bloquear** cierra el acceso. **🔑** genera una contraseña nueva: se muestra una vez y, si configuraste el correo, se le envía al comprador.
+- Si el comprador olvida la contraseña, la recupera solo desde la tienda (**¿Olvidaste tu contraseña?**): recibe un enlace que vence en 1 hora.
+
+### Correo para avisos
+
+En **Mi tienda → Correo para avisos** cargá una casilla de tu dominio (en DonWeb: panel del hosting → Correo). Normalmente: servidor `mail.tudominio.com.ar`, seguridad **SSL (puerto 465)**, usuario y contraseña de la casilla. Con **Enviar email de prueba** comprobás que funcione. Vixan lo usa para avisarte de cuentas nuevas, confirmarle al comprador que su cuenta está aprobada y enviar los enlaces para recuperar contraseñas.
+
 ## Facturar con ARCA
 
 Vixan emite facturas A, B o C con CAE a nombre de tu CUIT. La conexión se configura una sola vez, en **Configuración → Facturación electrónica (ARCA)**, y conviene empezar en **modo prueba**, donde las facturas no tienen validez fiscal.

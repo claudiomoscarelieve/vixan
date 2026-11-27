@@ -89,6 +89,7 @@ router.get('/estado', wrap((req) => {
     marcados: ctx.productos.filter((p) => p.market).length,
     lista: cat.tienda.lista,
     listas: [{ id: 'general', nombre: 'Precio general' }, ...ctx.listas.filter((l) => !l.archivada).map((l) => ({ id: l.id, nombre: l.nombre }))],
+    idPublico: require('./cuentas').idPublico(t),
     urlApi: `${(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}`,
   };
 }));

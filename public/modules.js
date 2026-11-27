@@ -580,7 +580,9 @@ async function tiendaConfig(el) {
     <p class="muted">La tienda se conecta a Vixan con una <b>clave de tienda</b>: solo puede leer el catálogo publicado, no ve pedidos, clientes ni nada más de tu cuenta.</p>
     <div style="margin:8px 0">Estado: ${est.clave ? badge(`Clave ${est.clave.prefijo}… creada el ${date(est.clave.created_at)}`, 'ok') : badge('Sin clave', 'err')}</div>
     <div class="small muted">Última vez que la tienda leyó el catálogo: <b>${cuando(est.conexion?.ultima)}</b></div>
-    <div class="small" style="margin:10px 0 4px">Dirección de Vixan para la configuración de la tienda:</div><code class="k">${esc(est.urlApi)}</code>
+    <div class="small" style="margin:10px 0 4px">Para la configuración de la tienda (config.json → vixan):</div>
+    <div class="small">Dirección: <code class="k">${esc(est.urlApi)}</code> · ID de la tienda: <code class="k">${esc(est.idPublico)}</code></div>
+    <div class="small muted" style="margin-top:4px">El ingreso de compradores solo funciona desde la <b>dirección de la tienda</b> que cargues a la izquierda.</div>
     <div class="toolbar" style="margin-top:12px"><button class="btn primary" data-clave>${est.clave ? 'Generar clave nueva' : 'Generar clave de la tienda'}</button>${est.clave ? '<button class="btn" data-revocar>Desconectar</button>' : ''}<button class="btn" data-ver>Ver qué publica</button></div>
   </div></div>`;
   const f = VG.form(fields, { ...cfgT, lista: String(valorLista) });
@@ -596,12 +598,74 @@ async function tiendaConfig(el) {
     } catch (e) { VG.toast(e.message, true); }
   };
   el.querySelector('[data-revocar]')?.addEventListener('click', async () => { if (!VG.confirm('La tienda deja de recibir el catálogo. ¿Desconectar?')) return; await VG.del('/api/tienda/clave'); VG.toast('Tienda desconectada'); tiendaConfig(el); });
+  const cajaCorreo = VG.h('<div class="card" style="margin-top:14px"></div>'); el.appendChild(cajaCorreo); correoConfig(cajaCorreo);
   el.querySelector('[data-ver]').onclick = async () => {
     const d = await VG.get('/api/tienda/vista-previa');
     VG.modal({ title: `Lo que ve la tienda (${d.productos.length} productos)`, wide: true, body: d.productos.length
       ? `<table class="t"><thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock</th><th class="num">Fotos</th></tr></thead><tbody>${d.productos.map((p) => `<tr><td><code class="k">${esc(p.sku)}</code></td><td>${esc(p.nombre)}</td><td>${esc([p.categoria, p.subcategoria].filter(Boolean).join(' › ') || '—')}</td><td class="num">${money(p.precio)}</td><td class="num">${VG.n(p.stock)}</td><td class="num">${p.imagenes.length}</td></tr>`).join('')}</tbody></table>`
       : '<p>Todavía no hay productos para la tienda. En Catálogo, editá cada producto y marcá <b>Publicar en la tienda</b>; tiene que tener precio en la lista elegida.</p>' });
   };
+}
+
+// ═════════════ Correo de la cuenta (SMTP) ═════════════
+async function correoConfig(el) {
+  const c = await VG.get('/api/correo');
+  const fields = [
+    { k: 'host', label: 'Servidor de correo (SMTP)', placeholder: 'mail.tutiendaconia.com.ar' },
+    { k: 'seguridad', label: 'Seguridad', type: 'select', options: [['ssl', 'SSL (puerto 465)'], ['starttls', 'STARTTLS (puerto 587)']] },
+    { k: 'puerto', label: 'Puerto', type: 'number', placeholder: '465' },
+    { k: 'usuario', label: 'Usuario (casilla completa)', placeholder: 'ventas@tutiendaconia.com.ar' },
+    { k: 'clave', label: 'Contraseña de la casilla', type: 'password' },
+    { k: 'remitente', label: 'Enviar desde (email)', placeholder: 'igual al usuario' },
+    { k: 'nombre', label: 'Nombre del remitente', placeholder: 'Tu Tienda con IA' },
+    { k: 'avisos', label: 'Avisos de cuentas nuevas a', placeholder: 'tu email' },
+  ];
+  el.innerHTML = `<h3>✉️ Correo para avisos ${c.configurado ? badge('Configurado', 'ok') : badge('Sin configurar', 'warn')}</h3>
+    <p class="muted small">Con este correo Vixan avisa de cuentas nuevas de la tienda, le confirma al comprador cuando aprobás su cuenta y envía los enlaces para recuperar contraseñas. Usá una casilla de tu dominio (por ejemplo la de DonWeb): los datos están en el panel del hosting, en Correo.</p>`;
+  const f = VG.form(fields, { ...c, puerto: c.puerto || '' }); el.appendChild(f);
+  const b = VG.h('<div class="toolbar" style="margin-top:12px"><button class="btn primary" data-g>Guardar</button><button class="btn" data-p>Enviar email de prueba</button></div>'); el.appendChild(b);
+  b.querySelector('[data-g]').onclick = async () => { try { await VG.put('/api/correo', VG.readForm(f, fields)); VG.toast('Correo guardado'); correoConfig(el); } catch (e) { VG.toast(e.message, true); } };
+  b.querySelector('[data-p]').onclick = async (e) => {
+    const btn = e.target; btn.disabled = true; btn.textContent = 'Enviando…';
+    try { await VG.put('/api/correo', VG.readForm(f, fields)); const r = await VG.post('/api/correo/probar', {}); VG.toast(`Email de prueba enviado a ${r.para}`); correoConfig(el); }
+    catch (err) { VG.toast(err.message, true); btn.disabled = false; btn.textContent = 'Enviar email de prueba'; }
+  };
+}
+
+// ═════════════ Compradores de la tienda (cuentas) ═════════════
+async function renderCompradores(el) {
+  const d = await VG.get('/api/tienda/cuentas');
+  const tono = { pendiente: 'warn', aprobada: 'ok', rechazada: 'err', bloqueada: 'err' };
+  const pend = d.cuentas.filter((c) => c.estado === 'pendiente').length;
+  const opcionesLista = (sel) => d.listas.map((l) => `<option value="${esc(l.id)}"${String(sel) === String(l.id) ? ' selected' : ''}>${esc(l.nombre)}</option>`).join('');
+  el.innerHTML = `${d.correo ? '' : '<div class="note warn">Configurá el <b>correo para avisos</b> en la pestaña Mi tienda: sin correo no se avisa de cuentas nuevas ni se pueden recuperar contraseñas desde la tienda.</div>'}
+  <div class="note">Los compradores se registran en la tienda con su CUIT y quedan <b>pendientes</b>. Al aprobarlos elegís su <b>lista de precios</b>: cuando ingresan, la tienda les muestra esos precios. Cada cuenta queda vinculada a un cliente en Clientes.</div>
+  <div class="grid g4" style="margin-bottom:14px">${VG.kpi({ label: 'Pendientes de aprobar', value: pend, tone: pend ? 'warn' : '' })}${VG.kpi({ label: 'Aprobadas', value: d.cuentas.filter((c) => c.estado === 'aprobada').length, tone: 'teal' })}${VG.kpi({ label: 'Total de cuentas', value: d.cuentas.length })}${VG.kpi({ label: 'Ingresaron últimos 30 días', value: d.cuentas.filter((c) => c.ultimo_ingreso && Date.now() - new Date(c.ultimo_ingreso) < 30 * 864e5).length })}</div>
+  <div class="card" style="padding:0;overflow:auto"><table class="t"><thead><tr><th>Comercio</th><th>Contacto</th><th>CUIT</th><th>Lista de precios</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead><tbody>
+  ${d.cuentas.map((c) => `<tr data-id="${c.id}"><td><b>${esc(c.razon_social)}</b>${c.localidad || c.provincia ? `<div class="small muted">${esc([c.localidad, c.provincia].filter(Boolean).join(', '))}</div>` : ''}${c.rubro ? `<div class="small muted">${esc(c.rubro)}</div>` : ''}</td>
+    <td>${esc(c.nombre)}<div class="small"><a href="mailto:${esc(c.email)}">${esc(c.email)}</a> · ${esc(c.telefono)}</div></td><td><code class="k">${esc(c.cuit)}</code>${c.condicion_iva ? `<div class="small muted">${esc(c.condicion_iva)}</div>` : ''}</td>
+    <td><select data-lista>${opcionesLista(c.lista)}</select></td><td>${badge(c.estado_txt, tono[c.estado])}<div class="small muted">desde ${date(c.creado)}</div></td><td>${c.ultimo_ingreso ? datetime(c.ultimo_ingreso) : '—'}</td>
+    <td style="white-space:nowrap">${c.estado !== 'aprobada' ? '<button class="btn primary" data-a="aprobar">Aprobar</button>' : ''}${c.estado === 'pendiente' ? ' <button class="btn" data-a="rechazar">Rechazar</button>' : ''}${c.estado === 'aprobada' ? '<button class="btn" data-a="bloquear">Bloquear</button>' : ''} <button class="btn" data-a="clave" title="Generar una contraseña nueva">🔑</button> <button class="icon-btn" data-a="borrar" title="Borrar la cuenta (el cliente sigue en Clientes)">✕</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Todavía no hay compradores registrados. El registro se hace desde la tienda, en Ingresar → Crear cuenta.</td></tr>'}
+  </tbody></table></div>`;
+  el.querySelectorAll('tr[data-id]').forEach((tr) => {
+    const id = tr.dataset.id; const c = d.cuentas.find((x) => String(x.id) === id);
+    tr.querySelector('[data-lista]').onchange = async (e) => { try { await VG.post(`/api/tienda/cuentas/${id}/lista`, { lista: e.target.value }); VG.toast('Lista de precios actualizada'); } catch (err) { VG.toast(err.message, true); } };
+    tr.querySelectorAll('[data-a]').forEach((b) => b.onclick = async () => {
+      const a = b.dataset.a;
+      try {
+        if (a === 'aprobar') { await VG.post(`/api/tienda/cuentas/${id}/aprobar`, { lista: tr.querySelector('[data-lista]').value }); VG.toast(`Cuenta aprobada${d.correo ? ': le avisamos por email' : ''}`); }
+        if (a === 'rechazar' && VG.confirm(`¿Rechazar la cuenta de ${c.razon_social}?`)) await VG.post(`/api/tienda/cuentas/${id}/rechazar`);
+        if (a === 'bloquear' && VG.confirm(`¿Bloquear la cuenta de ${c.razon_social}? No va a poder ingresar a la tienda.`)) await VG.post(`/api/tienda/cuentas/${id}/bloquear`);
+        if (a === 'borrar' && VG.confirm(`¿Borrar la cuenta de ${c.email}? El cliente sigue en Clientes.`)) await VG.del(`/api/tienda/cuentas/${id}`);
+        if (a === 'clave') {
+          if (!VG.confirm(`¿Generar una contraseña nueva para ${c.email}? La actual deja de funcionar.`)) return;
+          const r = await VG.post(`/api/tienda/cuentas/${id}/clave`, { enviar: d.correo });
+          VG.modal({ title: 'Contraseña nueva', body: `<p>La contraseña nueva de <b>${esc(c.email)}</b> es:</p><code class="k" style="font-size:18px">${esc(r.clave)}</code><p class="small muted" style="margin-top:10px">${r.enviado ? 'También se la enviamos por email.' : 'Pasásela al comprador (por ejemplo por WhatsApp).'} La puede cambiar desde Mi cuenta en la tienda.</p>` });
+        }
+        renderCompradores(el);
+      } catch (err) { VG.toast(err.message, true); }
+    });
+  });
 }
 
 // ═════════════ WhatsApp ═════════════
@@ -669,6 +733,7 @@ VG.MODULES = [
   { id: 'mi-tienda', label: 'Vixan Market', icon: '🛍️', group: 'Ventas', title: 'Vixan Market', desc: 'Tu tienda online de venta directa.', tabs: [
     { label: 'Pedidos', crud: { entity: 'pedidos', canCreate: false, load: async () => (await VG.get('/api/r/pedidos')).filter((p) => ['Vixan Market', 'Venta directa'].includes(p.plataforma)), sort: byDateDesc(), chips: { k: 'pago', options: [['Pendiente', 'Sin pagar'], ['Pagado', 'Pagados']] }, columns: pedidosCrud.columns, onRow: verPedido } },
     { label: 'Mi tienda', render: tiendaConfig },
+    { label: 'Compradores', render: renderCompradores },
     { label: 'Promociones', crud: { entity: 'tienda_promos', columns: [{ k: 'sku', label: 'SKU' }, { k: 'tipo', label: 'Tipo' }, { k: 'valor', label: 'Valor', num: true }, { k: 'desde', label: 'Desde', fmt: date }, { k: 'hasta', label: 'Hasta', fmt: date }, { k: 'etiqueta', label: 'Etiqueta' }, { k: 'activa', label: 'Vigente', get: (r) => (r.activa && VG.today() >= r.desde && VG.today() <= r.hasta ? 'Vigente' : 'No vigente'), fmt: tb }], form: [{ k: 'sku', label: 'SKU', type: 'select', options: prodOptions }, { k: 'tipo', label: 'Tipo', type: 'select', options: ['Porcentaje', 'Monto fijo', '2x1'] }, { k: 'valor', label: 'Valor', type: 'number' }, { k: 'etiqueta', label: 'Etiqueta' }, { k: 'desde', label: 'Desde', type: 'date' }, { k: 'hasta', label: 'Hasta', type: 'date' }, { k: 'activa', label: 'Activa', type: 'checkbox', default: true }], newLabel: '+ Nueva promoción' } },
   ] },
   { id: 'whatsapp', label: 'WhatsApp', icon: '💬', group: 'Ventas', title: 'WhatsApp', desc: 'Conversaciones con tus compradores y envíos masivos.', tabs: [

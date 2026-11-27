@@ -1,6 +1,6 @@
 {
   "name": "vixan",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Vixan — plataforma multicliente de logística y gestión para e-commerce",
   "main": "server/index.js",
   "scripts": {

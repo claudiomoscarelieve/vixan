@@ -4,6 +4,15 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## 1.9.0 + Vixan Tienda 0.5.0 — 27/11/2026
+**Cuentas de compradores en la tienda**:
+- **Registro con aprobación**: el comercio se registra en la tienda con razón social, CUIT (se valida el dígito verificador), condición de IVA, contacto y dirección. Queda pendiente y se vincula con el cliente existente (por CUIT o email) o crea uno nuevo con la etiqueta Tienda.
+- **Vixan Market → Compradores**: aprobar eligiendo la lista de precios, cambiar la lista, rechazar, bloquear, generar contraseña nueva y borrar la cuenta.
+- **Precio según la lista del cliente**: al ingresar, la tienda reemplaza los precios de todas las páginas, la ficha, la búsqueda y el pedido guardado por los de su lista; lo que no tiene precio en su lista aparece como "Consultar precio". El pedido por WhatsApp incluye la razón social y el CUIT.
+- **Mi cuenta** en la tienda: ingresar, crear cuenta, recuperar contraseña por email (enlace de 1 hora), cambiar contraseña y salir.
+- **Correo para avisos** (Mi tienda): envío de emails por SMTP con la casilla de la cuenta (SSL 465 o STARTTLS 587), sin dependencias nuevas, con email de prueba. Avisa de cuentas nuevas, confirma la aprobación y envía los enlaces de contraseña. La contraseña del correo no viaja en la configuración general.
+- Seguridad: la tienda habla con Vixan desde el navegador con un ID público y solo desde la dirección cargada en Mi tienda (CORS); sesión por token de 30 días; límite de intentos por IP; la recuperación no revela qué emails tienen cuenta.
+
 ## 1.8.0 — 27/11/2026
 **Configuración**:
 - **Logo como archivo** (Datos de facturación → Subir logo): se achica solo y sale en facturas, notas de crédito/débito y remitos. El remito usa la razón social de la cuenta.
