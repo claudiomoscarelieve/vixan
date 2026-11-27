@@ -87,7 +87,7 @@ const FILAS_POS = [
   ['IVA'], ['debito', 'Débito fiscal (ventas)'], ['credito', 'Crédito fiscal (compras computables)', -1], ['credito_ordenes', '· de compras con orden', -1, true], ['credito_arca', '· de comprobantes que sólo están en ARCA', -1, true],
   ['favor_anterior', 'Saldo técnico a favor del mes anterior', -1], ['tecnico', 'Saldo técnico (negativo: a favor)'], ['percep_iva', 'Percepciones de IVA sufridas', -1], ['ret_iva', 'Retenciones de IVA sufridas', -1],
   ['libre_anterior', 'Saldo de libre disponibilidad del mes anterior', -1], ['a_pagar', 'IVA a pagar', 1, false, true], ['favor_siguiente', 'Saldo técnico a favor que pasa al mes siguiente'], ['libre_siguiente', 'Libre disponibilidad que pasa al mes siguiente'],
-  ['A DEPOSITAR COMO AGENTE'], ['imp_internos', 'Impuestos internos facturados'],
+  ['A DEPOSITAR COMO AGENTE'], ['percep_iva_practicadas', 'Percepciones de IVA practicadas'], ['imp_internos', 'Impuestos internos facturados'],
   ['INGRESOS BRUTOS'], ['base_iibb', 'Base: ventas netas del mes'], ['percep_iibb', 'Percepciones de IIBB sufridas'], ['ret_iibb', 'Retenciones de IIBB sufridas'],
   ['OTROS'], ['ganancias', 'Retenciones de Ganancias / SUSS sufridas'], ['iva_costo', 'IVA no computable (factura B, C: queda en el costo)'], ['imp_costo', 'Otros tributos de compras (costo)'],
 ];

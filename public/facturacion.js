@@ -115,7 +115,7 @@ function facturaManual(alTerminar, previo = {}) {
     </div>
     <h3>Ítems <button class="btn small" data-add>+ Agregar línea</button></h3>
     <table class="t" data-items><thead><tr><th>Descripción</th><th>SKU</th><th class="num">Cant.</th><th class="num">Precio neto unit.</th><th class="num">IVA</th><th class="num">Imp. int. unit.</th><th class="num">Subtotal</th><th></th></tr></thead><tbody></tbody></table>
-    <div style="display:flex;justify-content:flex-end;margin-top:10px"><table class="t" style="width:auto" data-tot></table></div>
+    <div style="display:flex;justify-content:flex-end;align-items:flex-start;gap:16px;margin-top:10px"><label class="check" data-per-w style="display:none;margin-top:8px"><input type="checkbox" data-per> Percepción de IVA <span class="small muted" data-per-txt></span></label><table class="t" style="width:auto" data-tot></table></div>
     <p class="muted small">⚠️ Una factura manual no está asociada a ningún pedido y no afecta el stock. Los precios van <b>sin IVA</b>; el IVA y los impuestos internos se suman.</p>
   </div>`);
   const $ = (s) => body.querySelector(s);
@@ -141,8 +141,28 @@ function facturaManual(alTerminar, previo = {}) {
     });
     const ivas = Object.entries(g).filter(([a]) => Number(a) > 0).map(([a, n]) => [a, r2(n * a / 100)]);
     const iva = r2(ivas.reduce((x, [, v]) => x + v, 0));
-    $('[data-tot]').innerHTML = `<tr><td>Subtotal neto</td><td class="num">${m2(neto)}</td></tr>${ivas.map(([a, v]) => `<tr><td>IVA ${String(a).replace('.', ',')}%</td><td class="num">${m2(v)}</td></tr>`).join('')}${ii ? `<tr><td>Impuestos internos</td><td class="num">${m2(ii)}</td></tr>` : ''}<tr><td><b>TOTAL</b></td><td class="num"><b>${m2(neto + iva + ii)}</b></td></tr>`;
+    const per = $('[data-per]').checked && percep.aplica ? percep.importe : 0;
+    $('[data-tot]').innerHTML = `<tr><td>Subtotal neto</td><td class="num">${m2(neto)}</td></tr>${ivas.map(([a, v]) => `<tr><td>IVA ${String(a).replace('.', ',')}%</td><td class="num">${m2(v)}</td></tr>`).join('')}${ii ? `<tr><td>Impuestos internos</td><td class="num">${m2(ii)}</td></tr>` : ''}${per ? `<tr><td>Percepción de IVA</td><td class="num">${m2(per)}</td></tr>` : ''}<tr><td><b>TOTAL</b></td><td class="num"><b>${m2(neto + iva + ii + per)}</b></td></tr>`;
+    clearTimeout(timerPer); timerPer = setTimeout(consultarPercepcion, 350);
   }
+  // Percepción de IVA (Configuración → Percepción y deuda): se tilda sola según la regla; se puede tildar o destildar a mano
+  let percep = { aplica: false, importe: 0 }, tocada = false, timerPer = null, ultimaClave = '';
+  async function consultarPercepcion() {
+    const datos = { tipo: $('[data-tipo]').value, cond_iva_receptor: Number($('[data-cond]').value), items: leer() };
+    const clave = JSON.stringify(datos); if (clave === ultimaClave) return; ultimaClave = clave;
+    try {
+      const r = await VG.post('/api/arca/percepcion', datos);
+      $('[data-per-w]').style.display = r.activa ? '' : 'none';
+      percep = r.activa ? r : { aplica: false, importe: 0 };
+      if (!tocada) $('[data-per]').checked = !!r.auto;
+      $('[data-per]').disabled = !r.aplica;
+      $('[data-per-txt]').textContent = r.aplica ? `${m2(r.importe)} (${String(r.alic).replace('.', ',')}%)` : r.activa ? '(no corresponde a este comprobante)' : '';
+      calcularSinConsulta();
+    } catch { /* sin vista previa */ }
+  }
+  function calcularSinConsulta() { const t = timerPer; calcular(); clearTimeout(timerPer); timerPer = t; }
+  $('[data-per]').onchange = () => { tocada = true; calcularSinConsulta(); };
+  $('[data-cond]').onchange = calcular;
   const cambioTipo = () => { const t = $('[data-tipo]').value; $('[data-asoc-w]').style.display = /^(NC|ND) /.test(t) ? '' : 'none'; $('[data-asoct-w]').style.display = /^ND /.test(t) ? '' : 'none'; calcular(); };
   $('[data-tipo]').onchange = cambioTipo;
   $('[data-add]').onclick = () => fila();
@@ -151,7 +171,7 @@ function facturaManual(alTerminar, previo = {}) {
   VG.modal({ title: '📝 Factura manual', body, wide: true, saveLabel: 'Emitir fiscalmente', onSave: async () => {
     const items = leer();
     if (!items.length) throw new Error('Agregá al menos una línea con descripción, cantidad y precio');
-    const datos = { tipo: $('[data-tipo]').value, asociado: $('[data-asoc]').value, asociado_tipo: $('[data-asoct]').value, cliente: $('[data-cli]').value, cuit: $('[data-cuit]').value, domicilio: $('[data-dom]').value, cond_iva_receptor: Number($('[data-cond]').value), items };
+    const datos = { tipo: $('[data-tipo]').value, asociado: $('[data-asoc]').value, asociado_tipo: $('[data-asoct]').value, cliente: $('[data-cli]').value, cuit: $('[data-cuit]').value, domicilio: $('[data-dom]').value, cond_iva_receptor: Number($('[data-cond]').value), items, percepcion: $('[data-per-w]').style.display === 'none' ? undefined : $('[data-per]').checked };
     if (!VG.confirm('¿Emitir este comprobante en ARCA? Una vez autorizado no se puede borrar.')) throw new Error('Cancelado');
     const r = await VG.post('/api/arca/factura-manual', datos);
     VG.toast(`${r.tipo} ${r.numero} emitida · CAE ${r.cae}`); imprimir(r.id); alTerminar?.();
@@ -263,7 +283,7 @@ function exportarFacturas(ctxT) {
       const cols = ['fecha', 'comprobante', 'cliente', 'sku', 'producto', 'cantidad', 'neto', 'alicuota', 'iva', 'imp_int', 'cae'].map((k) => ({ label: k.replace('_', ' '), get: (x) => (k === 'fecha' ? VG.date(x[k]) : x[k]) }));
       return fmt === 'pdf' ? VG.exportPDF(`Detalle de facturas ${VG.date(desde)} a ${VG.date(hasta)}`, cols, r.filas) : VG.exportExcel(`facturas-detalle-${desde}`, cols, r.filas);
     }
-    const nombres = { fecha: 'Fecha', tipo: 'Tipo', numero: 'Número', cliente: 'Cliente', doc: 'CUIT/DNI', cond_iva: 'Cond. IVA', neto_21: 'Neto 21%', iva_21: 'IVA 21%', neto_105: 'Neto 10,5%', iva_105: 'IVA 10,5%', neto_27: 'Neto 27%', iva_27: 'IVA 27%', neto_otras: 'Neto otras', iva_otras: 'IVA otras', no_gravado: 'No gravado (C)', imp_internos: 'Imp. internos', total: 'Total', cae: 'CAE', pedido: 'Pedido' };
+    const nombres = { fecha: 'Fecha', tipo: 'Tipo', numero: 'Número', cliente: 'Cliente', doc: 'CUIT/DNI', cond_iva: 'Cond. IVA', neto_21: 'Neto 21%', iva_21: 'IVA 21%', neto_105: 'Neto 10,5%', iva_105: 'IVA 10,5%', neto_27: 'Neto 27%', iva_27: 'IVA 27%', neto_otras: 'Neto otras', iva_otras: 'IVA otras', no_gravado: 'No gravado (C)', imp_internos: 'Imp. internos', percep_iva: 'Percepción IVA', total: 'Total', cae: 'CAE', pedido: 'Pedido' };
     const cols = Object.entries(nombres).map(([k, l]) => ({ label: l, get: (x) => (k === 'fecha' && x[k] ? VG.date(x[k]) : x[k]) }));
     const filas = [...r.filas, r.total];
     if (fmt === 'pdf') VG.exportPDF(`Resumen fiscal ${VG.date(desde)} a ${VG.date(hasta)}`, cols.filter((c) => !['CAE', 'Pedido', 'Neto otras', 'IVA otras', 'Cond. IVA'].includes(c.label)), filas); else VG.exportExcel(`resumen-fiscal-${desde}`, cols, filas);

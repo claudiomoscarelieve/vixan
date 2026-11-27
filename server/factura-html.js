@@ -11,7 +11,9 @@ const DOC = { 80: 'CUIT', 86: 'CUIL', 96: 'DNI', 99: '' };
 async function facturaHTML(t, id) {
   const f = store.get(t, 'facturas', id);
   if (!f) throw new Error('No existe');
-  const em = store.getSettings(t).facturacion || {};
+  const st = store.getSettings(t);
+  const em = st.facturacion || {};
+  const logo = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(st.logo_archivo?.data || '') ? st.logo_archivo.data : '';
   const letra = String(f.tipo || 'B').replace(/^(NC|ND) /, '');
   const esNC = String(f.tipo).startsWith('NC');
   let qr = '';
@@ -61,7 +63,7 @@ async function facturaHTML(t, id) {
   <div class="hoja">
     <div class="orig">ORIGINAL</div>
     <div class="cab">
-      <div><h1>${esc(em.razon_social || '')}</h1><div><b>Domicilio:</b> ${esc(em.domicilio || '')}</div><div><b>Condición frente al IVA:</b> ${esc(em.condicion_iva || '')}</div></div>
+      <div>${logo ? `<img src="${logo}" alt="" style="max-height:70px;max-width:220px;display:block;margin-bottom:6px">` : ''}<h1>${esc(em.razon_social || '')}</h1><div><b>Domicilio:</b> ${esc(em.domicilio || '')}</div><div><b>Condición frente al IVA:</b> ${esc(em.condicion_iva || '')}</div></div>
       <div class="letra"><b>${letra}</b><small>COD. ${String(f.cbte_tipo || '').padStart(2, '0')}</small></div>
       <div><h2>${esNC ? 'NOTA DE CRÉDITO' : esND ? 'NOTA DE DÉBITO' : 'FACTURA'}</h2>
         <div><b>Punto de venta:</b> ${String(f.punto_venta || '').padStart(5, '0')} &nbsp; <b>Comp. Nro:</b> ${String(f.nro || '').padStart(8, '0')}</div>
@@ -78,6 +80,7 @@ async function facturaHTML(t, id) {
     <div class="tot"><table>
       ${discrimina ? `<tr><td>Importe neto gravado</td><td class="n">${money(f.neto)}</td></tr>${alics.map((g) => `<tr><td>IVA ${g.alic}%</td><td class="n">${money(g.iva)}</td></tr>`).join('')}` : ''}
       ${f.imp_internos ? `<tr><td>Impuestos internos</td><td class="n">${money(f.imp_internos)}</td></tr>` : ''}
+      ${f.percep_iva ? `<tr><td>Percepción de IVA${f.percep_alic ? ` (${Number(f.percep_alic).toLocaleString('es-AR')}%)` : ''}</td><td class="n">${money(f.percep_iva)}</td></tr>` : ''}
       <tr><td>Importe total</td><td class="n">${money(f.total)}</td></tr></table></div>
     ${letra === 'B' ? `<div class="ley"><b>Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</b> — IVA contenido: ${money(f.iva)}</div>` : ''}
     ${leyendas.map((l) => `<div class="ley">${esc(l)}</div>`).join('')}

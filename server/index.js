@@ -275,8 +275,57 @@ const PRIVADAS = /^(arca_secret|arca_ta_|arca$|woo$|ml$)/;
 function settingsPublicas(t) {
   const s = store.getSettings(t);
   for (const k of Object.keys(s)) if (PRIVADAS.test(k)) delete s[k];
+  // el logo viaja aparte (GET /api/logo): acá sólo si está cargado
+  if (s.logo_archivo) { s.logo_cargado = { nombre: s.logo_archivo.nombre || '', version: s.logo_archivo.version || 1 }; delete s.logo_archivo; }
   return s;
 }
+// Logo de la cuenta: sale en facturas, notas de crédito/débito y remitos
+const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/;
+app.get('/api/logo', (req, res) => {
+  const l = store.getSettings(req.tenantId).logo_archivo;
+  const m = l && LOGO_RE.exec(l.data || '');
+  if (!m) return res.status(404).end();
+  res.set('Cache-Control', 'private, max-age=300').type(`image/${m[1]}`).send(Buffer.from(m[2], 'base64'));
+});
+app.post('/api/logo', onlyRoles('superadmin', 'admin'), wrap((req) => {
+  const data = String(req.body?.data || '');
+  if (!LOGO_RE.test(data)) throw new Error('El logo tiene que ser una imagen PNG, JPG o WEBP');
+  if (data.length > 1_400_000) throw new Error('La imagen es muy pesada: usá una de menos de 1 MB');
+  const ant = store.getSettings(req.tenantId).logo_archivo;
+  store.setSetting(req.tenantId, 'logo_archivo', { data, nombre: String(req.body.nombre || '').slice(0, 120), version: (ant?.version || 0) + 1 });
+  return true;
+}));
+app.delete('/api/logo', onlyRoles('superadmin', 'admin'), wrap((req) => { store.setSetting(req.tenantId, 'logo_archivo', null); return true; }));
+
+// Aviso de deuda: pedidos impagos del cliente en los canales que cuentan (Mercado Libre nunca: es prepago)
+app.get('/api/clientes/deuda', wrap((req) => {
+  const cfg = store.getSettings(req.tenantId).deuda || {};
+  const nombre = String(req.query.cliente || '').trim().toLowerCase();
+  if (!cfg.avisar || !nombre) return { avisar: !!cfg.avisar, pedidos: [], total: 0 };
+  const canales = cfg.canales || {};
+  const cuenta = (plat) => {
+    if (/mercado ?libre/i.test(plat || '')) return false;
+    const k = /venta directa|manual|presupuesto/i.test(plat || '') ? 'directa' : /shopify/i.test(plat) ? 'shopify' : /tienda ?nube/i.test(plat) ? 'tiendanube' : /woo/i.test(plat) ? 'woocommerce' : /red ?101/i.test(plat) ? 'red101' : /vixan market/i.test(plat) ? 'market' : 'otros';
+    return canales[k] !== false;
+  };
+  const excluir = Number(req.query.excluir) || 0;
+  const pedidos = store.list(req.tenantId, 'pedidos').filter((p) => p.id !== excluir && String(p.cliente || '').trim().toLowerCase() === nombre && p.estado !== 'cancelado' && String(p.pago || '').toLowerCase() !== 'pagado' && cuenta(p.plataforma))
+    .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map((p) => ({ id: p.id, numero: p.numero, fecha: p.fecha, total: Number(p.total) || 0, plataforma: p.plataforma }));
+  return { avisar: true, pedidos, total: Math.round(pedidos.reduce((a, p) => a + p.total, 0) * 100) / 100 };
+}));
+// Vista previa de la percepción de IVA para la factura manual
+app.post('/api/arca/percepcion', wrap((req) => {
+  const b = req.body || {};
+  const cond = Number(b.cond_iva_receptor) || 5;
+  const letra = b.tipo && b.tipo !== 'auto' ? b.tipo : arca.letraPara(req.tenantId, cond);
+  const cfg = arca.configPercepcion(req.tenantId);
+  if (!cfg.activa) return { activa: false };
+  const items = (b.items || []).filter((i) => Number(i.cantidad) > 0);
+  const calc = arca.calcularImportes(letra, items.map((i) => ({ cantidad: Number(i.cantidad), precio: Number(i.neto || 0), alicuota: Number(i.alicuota ?? 21), imp_int: Number(i.imp_int || 0) })));
+  const auto = arca.calcularPercepcion(req.tenantId, { letra, condReceptor: cond, plataforma: 'Venta directa', items, calc });
+  const forzada = arca.calcularPercepcion(req.tenantId, { letra, condReceptor: cond, plataforma: 'Venta directa', items, calc, forzar: true });
+  return { activa: true, letra, aplica: !!forzada, auto: !!auto, importe: forzada?.importe || 0, alic: forzada?.alic || 0 };
+}));
 app.get('/api/settings', wrap((req) => settingsPublicas(req.tenantId)));
 app.put('/api/settings', onlyRoles('superadmin', 'admin'), wrap((req) => {
   for (const [k, v] of Object.entries(req.body || {})) { if (PRIVADAS.test(k)) continue; store.setSetting(req.tenantId, k, v); }

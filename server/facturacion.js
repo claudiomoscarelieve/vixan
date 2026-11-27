@@ -124,12 +124,12 @@ function exportar(t, { modo = 'resumen', desde, hasta } = {}) {
       fecha: f.fecha, tipo: f.tipo, numero: f.numero, cliente: f.cliente, doc: f.doc_tipo === 99 ? '' : f.doc_nro || '', cond_iva: arca.COND_IVA_NOMBRE[f.cond_iva_receptor] || '',
       neto_21: por(21, 'neto'), iva_21: por(21, 'iva'), neto_105: por(10.5, 'neto'), iva_105: por(10.5, 'iva'), neto_27: por(27, 'neto'), iva_27: por(27, 'iva'),
       neto_otras: r2(s * a.filter((g) => ![21, 10.5, 27].includes(g.alic)).reduce((x, g) => x + g.neto, 0)), iva_otras: r2(s * a.filter((g) => ![21, 10.5, 27].includes(g.alic)).reduce((x, g) => x + g.iva, 0)),
-      no_gravado: /C$/.test(String(f.tipo)) ? r2(s * (Number(f.total) - Number(f.imp_internos || 0))) : 0,
-      imp_internos: r2(s * Number(f.imp_internos || 0)), total: r2(s * Number(f.total)), cae: f.cae, pedido: f.pedido || '', estado: f.estado,
+      no_gravado: /C$/.test(String(f.tipo)) ? r2(s * (Number(f.total) - Number(f.imp_internos || 0) - Number(f.percep_iva || 0))) : 0,
+      imp_internos: r2(s * Number(f.imp_internos || 0)), percep_iva: r2(s * Number(f.percep_iva || 0)), total: r2(s * Number(f.total)), cae: f.cae, pedido: f.pedido || '', estado: f.estado,
     };
   });
   const tot = { fecha: '', tipo: 'TOTAL', numero: `${filas.length} comprobantes`, cliente: '', doc: '', cond_iva: '', cae: '', pedido: '', estado: '' };
-  for (const k of ['neto_21', 'iva_21', 'neto_105', 'iva_105', 'neto_27', 'iva_27', 'neto_otras', 'iva_otras', 'no_gravado', 'imp_internos', 'total']) tot[k] = r2(filas.reduce((a, f) => a + f[k], 0));
+  for (const k of ['neto_21', 'iva_21', 'neto_105', 'iva_105', 'neto_27', 'iva_27', 'neto_otras', 'iva_otras', 'no_gravado', 'imp_internos', 'percep_iva', 'total']) tot[k] = r2(filas.reduce((a, f) => a + f[k], 0));
   return { filas, total: tot, facturas: fs.filter((f) => !esNC(f)).length, ncs: fs.filter(esNC).length };
 }
 

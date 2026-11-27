@@ -4,6 +4,16 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## 1.8.0 — 27/11/2026
+**Configuración**:
+- **Logo como archivo** (Datos de facturación → Subir logo): se achica solo y sale en facturas, notas de crédito/débito y remitos. El remito usa la razón social de la cuenta.
+- **Email CC** (copias al cliente) en Datos de facturación.
+- Pestaña nueva **Percepción y deuda**:
+  - **Percepción de IVA** (Tributo Id 6) en facturas A: alícuota general y reducida para lo gravado al 10,5 %, mínimo de percepción, mínimo de venta (sobre neto o total), desde una fecha, sólo a Responsables Inscriptos, excluir Mercado Libre, sólo productos comestibles. En la factura manual se tilda sola y se puede destildar. Las notas de crédito devuelven la percepción en proporción. Entra al Libro IVA Ventas, al archivo de IVA Simple, al diario ("Percepciones de IVA a depositar") y a la posición mensual.
+  - **Aviso de deuda** al cargar un pedido, con los canales que cuentan (Mercado Libre nunca).
+  - **Nota de crédito automática** al cancelar una venta facturada.
+- Guardar Datos de facturación ya no borra otras opciones del mismo grupo.
+
 ## 1.7.1 — 27/11/2026
 - Vista previa del enlace (WhatsApp, redes, buscadores): título "Vixan — Plataforma integral para e-commerce", descripción e imagen del logo.
 

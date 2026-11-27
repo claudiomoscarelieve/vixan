@@ -191,6 +191,7 @@ VG.crud = (el, cfg) => {
   const openForm = (row) => {
     const fields = typeof cfg.form === 'function' ? cfg.form(row) : cfg.form;
     const formEl = VG.form(fields, row || cfg.defaults?.() || {});
+    try { cfg.onFormOpen?.(formEl, row); } catch (e) { console.error(e); }
     VG.modal({ title: row ? `Editar ${cfg.singular || ''}` : (cfg.newLabel || 'Nuevo').replace(/^\+\s*/, ''), body: formEl, wide: fields.some((f) => f.type === 'items'), onSave: async () => {
       let data = VG.readForm(formEl, fields);
       if (cfg.beforeSave) data = cfg.beforeSave(data, row) || data;

@@ -31,8 +31,8 @@ function asientosVentas(t, desde, hasta) {
   const lib = base.ventasLibro(t, { desde, hasta });
   return lib.filas.filter((r) => !r.prueba).map((r) => {
     const iva = r2(r.alicuotas.reduce((a, g) => a + g.iva, 0));
-    const neto = r2(r.total - iva - n0(r.imp_internos)); // todo lo que no es impuesto va a ventas
-    const L = [{ cuenta: C.deudores, debe: r.total }, { cuenta: C.iva_debito, haber: iva }, { cuenta: C.ventas, haber: neto }, { cuenta: C.imp_internos, haber: r.imp_internos }];
+    const neto = r2(r.total - iva - n0(r.imp_internos) - n0(r.percep_iva)); // todo lo que no es impuesto va a ventas
+    const L = [{ cuenta: C.deudores, debe: r.total }, { cuenta: C.iva_debito, haber: iva }, { cuenta: C.ventas, haber: neto }, { cuenta: C.imp_internos, haber: r.imp_internos }, { cuenta: C.percep_iva_ventas || '2.1.1.02.005', haber: n0(r.percep_iva) }];
     return { fecha: r.fecha, tipo: r.arca_id ? 'Venta por fuera de Vixan (ARCA)' : 'Venta', concepto: `${r.comprobante} · ${r.nombre}`, referencia: r.pedido || r.cae, lineas: r.signo < 0 ? invertir(L) : L };
   });
 }
@@ -181,7 +181,7 @@ function posicion(t, { desde, hasta } = {}) {
     cols.push({
       mes: m, debito, credito, credito_ordenes: S(c.filter((r) => r.orden_id), (r) => r.iva_computable), credito_arca: S(c.filter((r) => r.arca_id), (r) => r.iva_computable),
       favor_anterior: favorAnt, tecnico, percep_iva: percepIva, ret_iva: retIva, libre_anterior: libreAnt, a_pagar: aPagar, favor_siguiente: favorTec, libre_siguiente: libre,
-      percep_iva_practicadas: 0, imp_internos: S(v, (r) => r.imp_internos || 0),
+      percep_iva_practicadas: S(v, (r) => r.percep_iva || 0), imp_internos: S(v, (r) => r.imp_internos || 0),
       base_iibb: S(v, (r) => r.alicuotas.reduce((a, g) => a + g.neto, 0) + r.no_gravado + r.exento),
       percep_iibb: r2(S(c, (r) => r.percep_iibb) + filtRet(m, /percep.*(iibb|ingresos brutos)/)), ret_iibb: filtRet(m, /reten.*(iibb|ingresos brutos)/),
       ganancias: filtRet(m, /ganancias|suss/), iva_costo: S(c, (r) => r.iva_costo), imp_costo: S(c, (r) => r.otros_tributos),
@@ -211,7 +211,7 @@ function archivosLID(t, mes) {
     const alic = r.alicuotas.filter((g) => g.neto || g.iva);
     const codOp = alic.length ? '0' : r.exento ? 'E' : 'N';
     ventasCbte.push([r.fecha.replace(/-/g, ''), nro(r.cbte_tipo, 3), nro(r.punto_venta, 5), nro(r.nro, 20), nro(r.nro, 20), nro(dt, 2), nro(dt === 99 ? 0 : r.doc_nro, 20), txt(dt === 99 ? 'CONSUMIDOR FINAL' : r.nombre, 30),
-      imp(r.total), imp(r.no_gravado), imp(0), imp(r.exento), imp(0), imp(0), imp(0), imp(r.imp_internos), 'PES', '0001000000', String(alic.length), codOp, imp(r.otros_tributos), '00000000'].join(''));
+      imp(r.total), imp(r.no_gravado), imp(0), imp(r.exento), imp(r.percep_iva || 0), imp(0), imp(0), imp(r.imp_internos), 'PES', '0001000000', String(alic.length), codOp, imp(r.otros_tributos), '00000000'].join(''));
     for (const g of alic) ventasAlic.push([nro(r.cbte_tipo, 3), nro(r.punto_venta, 5), nro(r.nro, 20), imp(g.neto), nro(base.ALIC_ID[g.alic] ?? 5, 4), imp(g.iva)].join(''));
   }
   for (const r of Cm) {

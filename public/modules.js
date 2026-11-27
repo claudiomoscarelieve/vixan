@@ -14,8 +14,12 @@ const settingsCache = { v: null };
 const getSettings = async () => (settingsCache.v ||= await VG.get('/api/settings'));
 
 // ═════════════ Impresión de etiquetas / remitos ═════════════
-function imprimir(pedidos, formato) {
-  const t = VG.app.tenant?.nombre || 'Vixan';
+async function imprimir(pedidos, formato) {
+  const w = window.open('', '_blank');
+  const st = await getSettings().catch(() => ({}));
+  const logoUrl = st.logo_cargado ? `/api/logo?v=${st.logo_cargado.version}` : (st.apariencia?.logo || '');
+  const logo = logoUrl ? `<img src="${esc(logoUrl)}" alt="" style="max-height:60px;max-width:200px;display:block;margin-bottom:4px">` : '';
+  const t = st.facturacion?.razon_social || VG.app.tenant?.nombre || 'Vixan';
   const css = formato === 'ticket'
     ? '@page{size:100mm 150mm;margin:0}.lb{width:100mm;height:150mm;padding:6mm;box-sizing:border-box;page-break-after:always;border:1px dashed #ccc}'
     : '@page{size:A4;margin:12mm}.lb{page-break-after:always;padding:4mm}';
@@ -26,14 +30,13 @@ function imprimir(pedidos, formato) {
       <hr><div style="font-size:30px;font-weight:900;letter-spacing:1px;text-align:center;font-family:monospace">${esc(p.numero)}</div>
       <svg viewBox="0 0 300 60" style="width:100%;height:60px">${[...String(p.numero)].map((ch, i) => `<rect x="${i * 300 / String(p.numero).length}" y="0" width="${(ch.charCodeAt(0) % 5) + 2}" height="60"/>`).join('')}</svg>
       <div style="font-size:11px;margin-top:6px">${(p.items || []).length} ítems · ${date(p.fecha)} · Bultos: 1</div></div>`;
-    return `<div class="lb"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2 style="margin:0">${esc(t)}</h2><div>Remito / Orden de entrega</div></div><div style="text-align:right"><b>Pedido ${esc(p.numero)}</b><br>${date(p.fecha)}<br>${esc(p.plataforma)} · ${esc(p.tipo_envio)}</div></div>
+    return `<div class="lb"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div>${logo}<h2 style="margin:0">${esc(t)}</h2><div>Remito / Orden de entrega</div></div><div style="text-align:right"><b>Pedido ${esc(p.numero)}</b><br>${date(p.fecha)}<br>${esc(p.plataforma)} · ${esc(p.tipo_envio)}</div></div>
       <hr><b>${esc(p.cliente)}</b><br>${esc(p.direccion || '')} — ${esc(p.localidad || '')} (CP ${esc(p.cp || '')})<br>Tel. ${esc(p.telefono || '—')}
       <table style="width:100%;border-collapse:collapse;margin-top:12px" border="1" cellpadding="5"><tr><th>SKU</th><th>Producto</th><th>Cant.</th>${formato === 'a4' ? '<th>Precio</th><th>Subtotal</th>' : ''}</tr>${items}</table>
       ${formato === 'a4' ? `<h3 style="text-align:right">Total ${money(p.total)}</h3><div>Pago: ${esc(p.pago)} — ${esc(p.metodo_pago || '')}</div>` : ''}
       <div style="margin-top:40px;display:flex;gap:40px"><div style="flex:1;border-top:1px solid #000;text-align:center">Firma</div><div style="flex:1;border-top:1px solid #000;text-align:center">Aclaración y DNI</div></div></div>`;
   }).join('');
-  const w = window.open('', '_blank');
-  w.document.write(`<html><head><title>Etiquetas</title><style>body{font-family:system-ui;margin:0}${css}</style></head><body>${body}<script>onload=()=>print()<\/script></body></html>`);
+  w.document.write(`<html><head><title>Etiquetas</title><style>body{font-family:system-ui;margin:0}${css}</style></head><body>${body}<script>onload=()=>setTimeout(()=>print(),150)<\/script></body></html>`);
   w.document.close();
 }
 
@@ -65,6 +68,24 @@ function verPedido(p, ctx) {
   }
   for (const [f, l] of [['a4', 'Imprimir remito'], ['ticket', 'Etiqueta 10x15']]) { const b = VG.h(`<button class="btn small" style="margin-left:auto">${l}</button>`); b.onclick = () => imprimir([p], f); est.appendChild(b); }
 }
+// Cartel de deuda al cargar un pedido (Configuración → Percepción y deuda)
+function avisoDeuda(formEl, row) {
+  const inp = formEl.querySelector('[name=cliente]') || formEl.querySelector('input');
+  if (!inp) return;
+  const cartel = VG.h('<div class="note warn" style="display:none;margin-bottom:10px;grid-column:1/-1"></div>');
+  formEl.prepend(cartel);
+  const revisar = async () => {
+    const c = inp.value.trim(); if (!c) { cartel.style.display = 'none'; return; }
+    try {
+      const r = await VG.get(`/api/clientes/deuda?${new URLSearchParams({ cliente: c, excluir: row?.id || '' })}`);
+      if (!r.avisar || !r.pedidos.length) { cartel.style.display = 'none'; return; }
+      cartel.innerHTML = `⚠️ <b>${esc(c)}</b> tiene ${r.pedidos.length} pedido(s) impago(s) por <b>${money(r.total)}</b>: ${r.pedidos.slice(0, 5).map((p) => `${esc(p.numero)} (${date(p.fecha)}, ${money(p.total)})`).join(', ')}${r.pedidos.length > 5 ? '…' : ''}. Podés tomar el pedido igual.`;
+      cartel.style.display = '';
+    } catch { cartel.style.display = 'none'; }
+  };
+  inp.addEventListener('change', revisar); inp.addEventListener('blur', revisar);
+  if (inp.value) revisar();
+}
 const pedidosCrud = {
   entity: 'pedidos', singular: 'pedido', newLabel: '+ Nuevo pedido', createPath: '/api/pedidos', selectable: true, sort: byDateDesc(), dateFilter: 'fecha',
   chips: { k: 'estado', options: [['pendiente', 'Pendientes'], ['para_armar', 'Para armar'], ['para_despachar', 'Para despachar'], ['enviado', 'Enviados'], ['entregado', 'Entregados'], ['cancelado', 'Cancelados'], ['sin_seg', '⚠️ Sin seguimiento']], match: (r, v) => (v === 'sin_seg' ? ['enviado', 'entregado'].includes(r.estado) && !r.tracking : r.estado === v) },
@@ -76,7 +97,7 @@ const pedidosCrud = {
     { k: 'total', label: 'Total', fmt: money, num: true }, { k: 'deposito', label: 'Depósito' }, { k: 'pago', label: 'Pago', fmt: tb },
     { k: 'estado', label: 'Estado', fmt: VG.estadoBadge },
   ],
-  form: formPedido, canEdit: true, onRow: verPedido,
+  form: formPedido, canEdit: true, onRow: verPedido, onFormOpen: avisoDeuda,
   footer: totalFoot(['total']),
   toolbar: (ctx) => {
     const sel = () => ctx.rows.filter((r) => ctx.sel.has(r.id));
@@ -440,8 +461,86 @@ function settingsForm(key, fields, intro) {
     el.innerHTML = intro ? `<div class="note">${intro}</div>` : '';
     const c = VG.h('<div class="card"></div>'); c.appendChild(f);
     const b = VG.h('<div class="toolbar" style="margin-top:12px"><button class="btn primary">Guardar</button></div>');
-    b.querySelector('button').onclick = async () => { try { const v = VG.readForm(f, fields); await VG.put('/api/settings', { [key]: v }); settingsCache.v = null; VG.toast('Configuración guardada'); } catch (e) { VG.toast(e.message, true); } };
+    b.querySelector('button').onclick = async () => { try { const v = VG.readForm(f, fields); const prev = (await VG.get('/api/settings'))[key] || {}; await VG.put('/api/settings', { [key]: { ...prev, ...v } }); settingsCache.v = null; VG.toast('Configuración guardada'); } catch (e) { VG.toast(e.message, true); } };
     c.appendChild(b); el.appendChild(c);
+  };
+}
+// Logo de la cuenta (archivo): sale en facturas, notas de crédito y débito, y remitos
+async function tarjetaLogo() {
+  const c = VG.h('<div class="card" style="margin-top:12px"><h3>Logo</h3><div data-l></div></div>');
+  const pintar = async () => {
+    settingsCache.v = null; const s = await getSettings();
+    const l = c.querySelector('[data-l]');
+    l.innerHTML = `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">${s.logo_cargado ? `<img src="/api/logo?v=${s.logo_cargado.version}" alt="Logo" style="max-height:70px;max-width:220px;border:1px solid var(--border);border-radius:8px;padding:6px;background:#fff">` : '<span class="muted small">Sin logo: las facturas y remitos salen sólo con tu razón social.</span>'}
+      <button class="btn" data-sub>${s.logo_cargado ? 'Cambiar logo' : 'Subir logo'}</button>${s.logo_cargado ? '<button class="btn danger" data-del>Quitar</button>' : ''}</div>
+      <p class="small muted">Elegí una imagen PNG o JPG de tu computadora. Se achica sola para que no pese, y sale en facturas, notas de crédito y débito, y remitos.</p>`;
+    l.querySelector('[data-sub]').onclick = () => {
+      const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/png,image/jpeg,image/webp';
+      i.onchange = async () => {
+        const f = i.files[0]; if (!f) return;
+        try {
+          const data = await achicarImagen(f, 600, 240);
+          await VG.post('/api/logo', { data, nombre: f.name }); VG.toast('Logo guardado'); pintar();
+        } catch (e) { VG.toast(e.message, true); }
+      };
+      i.click();
+    };
+    l.querySelector('[data-del]')?.addEventListener('click', async () => { if (!VG.confirm('¿Quitar el logo?')) return; await VG.del('/api/logo'); VG.toast('Logo quitado'); pintar(); });
+  };
+  pintar();
+  return c;
+}
+// Achica la imagen en el navegador (máximo ancho × alto) y la devuelve como PNG en data URL
+function achicarImagen(file, maxW, maxH) {
+  return new Promise((ok, mal) => {
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, maxW / img.width, maxH / img.height);
+      const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
+      ok(cv.toDataURL('image/png'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('No se pudo leer la imagen')); };
+    img.src = url;
+  });
+}
+// Percepción de IVA en las facturas, aviso de deuda al tomar pedidos y nota de crédito automática
+async function renderPercepcionDeuda(el) {
+  settingsCache.v = null; const s = await getSettings();
+  const d = s.deuda || {}; const can = d.canales || {}; const p = s.percepcion_iva || {}; const ncAuto = !!s.facturacion?.nc_automatica;
+  const CANALES = [['directa', 'Venta directa / carga manual'], ['woocommerce', 'WooCommerce'], ['tiendanube', 'Tienda Nube'], ['shopify', 'Shopify'], ['market', 'Vixan Market'], ['red101', 'Red101'], ['otros', 'Otros']];
+  const chk = (attr, on, label, ayuda = '') => `<label class="check" style="display:flex;gap:8px;align-items:flex-start;margin:6px 0"><input type="checkbox" ${attr} ${on ? 'checked' : ''}><span><b>${label}</b>${ayuda ? `<div class="small muted">${ayuda}</div>` : ''}</span></label>`;
+  el.innerHTML = `<div class="card" style="margin-bottom:12px"><h3>🔔 Aviso de deuda</h3>
+      ${chk('data-d-avisar', d.avisar, 'Avisar cuando un cliente tiene deuda', 'Al cargar un pedido aparece un cartel si el cliente tiene pedidos impagos. Sólo avisa, no impide tomar el pedido.')}
+      <div class="small muted" style="margin:8px 0 4px">Qué pedidos impagos cuentan (Mercado Libre nunca cuenta: es prepago)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px 18px">${CANALES.map(([k, l]) => `<label class="check"><input type="checkbox" data-canal="${k}" ${can[k] !== false ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
+    <div class="card" style="margin-bottom:12px"><h3>🧾 Percepción de IVA</h3>
+      ${chk('data-p-activa', p.activa, 'Aplicar percepción de IVA en las facturas', 'Agrega una percepción de IVA (Tributo de ARCA Id 6) a las facturas A. En la factura manual se puede tildar o destildar; se tilda sola cuando la venta supera el monto mínimo.')}
+      <div class="form grid" style="grid-template-columns:repeat(4,1fr);margin-top:8px">
+        <label>Alícuota (%)<input type="number" step="0.01" data-p="pct" value="${p.pct ?? ''}" placeholder="Ej: 3"></label>
+        <label>Alícuota en lo gravado al 10,5 % (%)<input type="number" step="0.01" data-p="pct_reducida" value="${p.pct_reducida ?? ''}" placeholder="RG 5329: 1,5"></label>
+        <label>Sólo si la percepción supera ($)<input type="number" step="0.01" data-p="min_percepcion" value="${p.min_percepcion ?? ''}" placeholder="RG 5329: 3000"></label>
+        <label>Monto mínimo de la venta ($)<input type="number" step="0.01" data-p="min_venta" value="${p.min_venta ?? ''}" placeholder="0 = siempre"></label>
+        <label>Desde (fecha de la factura)<input type="date" data-p="desde" value="${p.desde || ''}"></label>
+        <label>El monto mínimo es sobre<select data-p="min_sobre"><option value="neto" ${p.min_sobre !== 'total' ? 'selected' : ''}>el neto (sin IVA)</option><option value="total" ${p.min_sobre === 'total' ? 'selected' : ''}>el total de la factura</option></select></label>
+        <label>Productos sin categoría<select data-p="sin_categoria"><option value="si" ${p.sin_categoria !== 'no' ? 'selected' : ''}>perciben</option><option value="no" ${p.sin_categoria === 'no' ? 'selected' : ''}>no perciben</option></select></label></div>
+      ${chk('data-p-solo_ri', p.solo_ri !== false, 'Sólo a clientes Responsables Inscriptos', 'RG 5329: al monotributista y al consumidor final no se les percibe, aunque reciban factura A.')}
+      ${chk('data-p-sin_ml', p.sin_ml, 'No percibir en las ventas de Mercado Libre', 'Sólo en las demás (venta directa, tienda propia, etc.).')}
+      ${chk('data-p-solo_comestibles', p.solo_comestibles, 'Sólo productos comestibles', 'Perciben los de categoría Alimentos, Bebidas, Almacén y Navidad; los de otra categoría (limpieza, bazar…) no.')}
+      <p class="small muted">La percepción se suma al total de la factura, entra al Libro IVA Ventas y al libro diario como "Percepciones de IVA a depositar", y la Posición mensual la muestra para depositarla como agente. Confirmá la alícuota con tu contador.</p></div>
+    <div class="card" style="margin-bottom:12px"><h3>Nota de crédito automática</h3>
+      ${chk('data-nc', ncAuto, 'Cuando se cancela una venta que ya tiene factura, emitir sola la nota de crédito', 'Sale en ARCA por el total de la factura, una sola vez, y queda en Facturación → Canceladas con factura. Las ventas que ya estaban canceladas al prenderla no se emiten solas: quedan en esa lista para revisarlas.')}</div>
+    <div class="toolbar"><button class="btn primary" data-g>Guardar</button></div>`;
+  el.querySelector('[data-g]').onclick = async () => {
+    try {
+      const canales = {}; el.querySelectorAll('[data-canal]').forEach((x) => { canales[x.dataset.canal] = x.checked; });
+      const per = { activa: el.querySelector('[data-p-activa]').checked, solo_ri: el.querySelector('[data-p-solo_ri]').checked, sin_ml: el.querySelector('[data-p-sin_ml]').checked, solo_comestibles: el.querySelector('[data-p-solo_comestibles]').checked };
+      el.querySelectorAll('[data-p]').forEach((x) => { per[x.dataset.p] = x.type === 'number' ? (x.value === '' ? '' : Number(x.value)) : x.value; });
+      if (per.activa && !(Number(per.pct) > 0)) throw new Error('Cargá la alícuota de la percepción');
+      await VG.put('/api/settings', { deuda: { avisar: el.querySelector('[data-d-avisar]').checked, canales }, percepcion_iva: per });
+      await VG.post('/api/facturacion/config', { nc_automatica: el.querySelector('[data-nc]').checked });
+      settingsCache.v = null; VG.toast('Configuración guardada');
+    } catch (e) { VG.toast(e.message, true); }
   };
 }
 async function renderUsuarios(el) {
@@ -661,7 +760,8 @@ VG.MODULES = [
 
   { id: 'cuentas', label: 'Análisis por cuenta', icon: '🧭', group: 'Cuenta', title: 'Análisis por cuenta', desc: 'Ventas, ticket y margen por cada cuenta conectada.', render: async (v) => { const el = VG.h('<div></div>'); v.appendChild(el); const r = await VG.get('/api/stats/resultados'); const p = await VG.get('/api/r/pedidos'); const cuenta = Object.fromEntries(p.map((x) => [x.id, x.cuenta || x.plataforma])); const g = {}; for (const f of r.filas) { const k = cuenta[f.id]; const o = (g[k] ||= { id: k, cuenta: k, pedidos: 0, ventas: 0, ganancia: 0 }); o.pedidos++; o.ventas += f.total; o.ganancia += f.ganancia; } VG.crud(el, { load: async () => Object.values(g), canCreate: false, canEdit: false, canDelete: false, columns: [{ k: 'cuenta', label: 'Cuenta' }, { k: 'pedidos', label: 'Pedidos', num: true }, { k: 'ventas', label: 'Ventas', fmt: money, num: true }, { k: 'ticket', label: 'Ticket', num: true, get: (x) => x.ventas / x.pedidos, fmt: money }, { k: 'ganancia', label: 'Ganancia', fmt: money, num: true }, { k: 'mg', label: 'Margen', num: true, get: (x) => (x.ventas ? x.ganancia / x.ventas : 0), fmt: VG.pct }], footer: totalFoot(['ventas', 'ganancia']) }); } },
   { id: 'configuracion', label: 'Configuración', icon: '⚙️', group: 'Cuenta', title: 'Configuración', desc: 'Datos de facturación, usuarios, costos, integraciones por API y apariencia.', tabs: [
-    { label: '📋 Datos de facturación', render: settingsForm('facturacion', [{ k: 'razon_social', label: 'Razón social', required: true }, { k: 'cuit', label: 'CUIT', required: true, placeholder: '30-12345678-9' }, { k: 'condicion_iva', label: 'Condición IVA', type: 'select', options: ['Responsable Inscripto', 'Monotributo', 'Exento'] }, { k: 'punto_venta', label: 'Punto de venta (Web Services)', type: 'number', required: true }, { k: 'domicilio', label: 'Domicilio fiscal', full: true }, { k: 'iibb', label: 'N° IIBB' }, { k: 'inicio_act', label: 'Inicio de actividades', type: 'date' }, { k: 'alicuota_default', label: 'Alícuota de IVA de tus ventas', type: 'select', options: [['21', '21%'], ['10.5', '10,5%']] }], 'Estos datos salen impresos en cada factura y se usan para pedir el CAE a ARCA.') },
+    { label: '📋 Datos de facturación', render: async (el) => { await settingsForm('facturacion', [{ k: 'razon_social', label: 'Razón social', required: true }, { k: 'cuit', label: 'CUIT', required: true, placeholder: '30-12345678-9' }, { k: 'condicion_iva', label: 'Condición IVA', type: 'select', options: ['Responsable Inscripto', 'Monotributo', 'Exento'] }, { k: 'punto_venta', label: 'Punto de venta (Web Services)', type: 'number', required: true }, { k: 'domicilio', label: 'Domicilio fiscal', full: true }, { k: 'iibb', label: 'N° IIBB' }, { k: 'inicio_act', label: 'Inicio de actividades', type: 'date' }, { k: 'alicuota_default', label: 'Alícuota de IVA de tus ventas', type: 'select', options: [['21', '21%'], ['10.5', '10,5%']] }, { k: 'email_cc', label: 'Email CC (copias al cliente)', type: 'email', placeholder: 'copias@tuempresa.com' }], 'Estos datos salen impresos en cada factura y se usan para pedir el CAE a ARCA.')(el); el.appendChild(await tarjetaLogo()); } },
+    { label: '🧾 Percepción y deuda', render: renderPercepcionDeuda },
     { label: '🧾 Facturación electrónica (ARCA)', render: renderArca },
     { label: '💸 Cobro por transferencia', render: settingsForm('transferencia', [{ k: 'banco', label: 'Banco' }, { k: 'titular', label: 'Titular' }, { k: 'cbu', label: 'CBU / CVU' }, { k: 'alias', label: 'Alias' }, { k: 'mensaje', label: 'Mensaje al comprador', type: 'textarea', full: true }]) },
     { label: '👥 Usuarios', render: renderUsuarios },

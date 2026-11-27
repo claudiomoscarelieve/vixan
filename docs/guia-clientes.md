@@ -188,6 +188,13 @@ Los certificados de WSASS no sirven para producción. Cuando las facturas de pru
 
 Más información en el [manual de WSASS de ARCA](https://www.afip.gob.ar/ws/WSASS/html/introduccion.html).
 
+### Logo, percepción de IVA y aviso de deuda
+
+- **Logo:** en **Configuración → Datos de facturación**, tocá **Subir logo** y elegí una imagen PNG o JPG de tu computadora. Sale en facturas, notas de crédito y débito, y remitos. Ahí mismo está **Email CC**, el correo que va en copia cuando Vixan mande comprobantes por mail.
+- **Percepción de IVA:** en **Configuración → Percepción y deuda**, activala y cargá la alícuota (y la reducida para lo gravado al 10,5 %), el mínimo de percepción, el mínimo de venta y desde qué fecha. Se aplica a facturas A (por defecto sólo a Responsables Inscriptos), se suma al total y entra a los libros. En la factura manual aparece la casilla **Percepción de IVA**: se tilda sola cuando corresponde y se puede destildar. Confirmá la alícuota con tu contador.
+- **Aviso de deuda:** en la misma pestaña, activá **Avisar cuando un cliente tiene deuda** y elegí qué canales cuentan. Al cargar un pedido aparece un cartel si el cliente tiene pedidos impagos (no impide tomarlo). Mercado Libre nunca cuenta.
+- **Nota de crédito automática:** también se prende desde esa pestaña.
+
 ### Facturar
 
 1. Revisá que cada cliente tenga su **condición frente al IVA** y su CUIT o DNI. Los pedidos de WooCommerce los traen solos del checkout; los de otros canales se cargan en **Clientes → Datos de clientes**. Si un cliente no tiene datos, se lo factura como Consumidor Final.

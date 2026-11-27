@@ -224,7 +224,10 @@ function lineasDesdeTotal(total, alicuota = 21, letra = 'B') {
 function xmlImportes(imp, letra) {
   const base = String(letra).replace(/^(NC|ND) /, '');
   const iva = base === 'C' || !imp.alicuotas.length ? '' : `<ar:Iva>${imp.alicuotas.map((g) => `<ar:AlicIva><ar:Id>${ALICUOTAS[g.alic]}</ar:Id><ar:BaseImp>${g.neto.toFixed(2)}</ar:BaseImp><ar:Importe>${g.iva.toFixed(2)}</ar:Importe></ar:AlicIva>`).join('')}</ar:Iva>`;
-  const trib = imp.imp_internos > 0 ? `<ar:Tributos><ar:Tributo><ar:Id>4</ar:Id><ar:Desc>Impuestos internos</ar:Desc><ar:BaseImp>${imp.base_imp_internos.toFixed(2)}</ar:BaseImp><ar:Alic>${(imp.base_imp_internos ? r2(imp.imp_internos / imp.base_imp_internos * 100) : 0).toFixed(2)}</ar:Alic><ar:Importe>${imp.imp_internos.toFixed(2)}</ar:Importe></ar:Tributo></ar:Tributos>` : '';
+  const ts = [];
+  if (imp.imp_internos > 0) ts.push(`<ar:Tributo><ar:Id>4</ar:Id><ar:Desc>Impuestos internos</ar:Desc><ar:BaseImp>${imp.base_imp_internos.toFixed(2)}</ar:BaseImp><ar:Alic>${(imp.base_imp_internos ? r2(imp.imp_internos / imp.base_imp_internos * 100) : 0).toFixed(2)}</ar:Alic><ar:Importe>${imp.imp_internos.toFixed(2)}</ar:Importe></ar:Tributo>`);
+  if (imp.percep_iva > 0) ts.push(`<ar:Tributo><ar:Id>6</ar:Id><ar:Desc>Percepcion de IVA</ar:Desc><ar:BaseImp>${imp.percep_base.toFixed(2)}</ar:BaseImp><ar:Alic>${imp.percep_alic.toFixed(2)}</ar:Alic><ar:Importe>${imp.percep_iva.toFixed(2)}</ar:Importe></ar:Tributo>`);
+  const trib = ts.length ? `<ar:Tributos>${ts.join('')}</ar:Tributos>` : '';
   return { iva, trib };
 }
 function validarReceptor(letra, total, condReceptor, doc) {
@@ -254,7 +257,7 @@ function armarComprobante(t, { letra, total, alicuota = 21, condReceptor, doc })
   return { total, neto, iva, alicuota, ivaXml: `<ar:Iva><ar:AlicIva><ar:Id>${idAlic}</ar:Id><ar:BaseImp>${neto.toFixed(2)}</ar:BaseImp><ar:Importe>${iva.toFixed(2)}</ar:Importe></ar:AlicIva></ar:Iva>` };
 }
 
-async function emitir(t, { letra, total, alicuota, condReceptor = 5, cuitODni, fecha, asociado, lineas }) {
+async function emitir(t, { letra, total, alicuota, condReceptor = 5, cuitODni, fecha, asociado, lineas, percepcion }) {
   const f = fiscal(t);
   const pto = Number(f.punto_venta);
   if (!pto) throw new Error('Falta el punto de venta en Datos de facturación (tiene que ser uno habilitado para "Web Services" en ARCA)');
@@ -263,6 +266,10 @@ async function emitir(t, { letra, total, alicuota, condReceptor = 5, cuitODni, f
   if (/^(NC|ND) /.test(letra) && !asociado) throw new Error('Las notas de crédito y de débito tienen que indicar el comprobante que corrigen');
   const doc = documentoDe(cuitODni);
   const calc = calcularImportes(letra, lineas || lineasDesdeTotal(total, alicuota ?? 21, letra));
+  const per = typeof percepcion === 'function' ? percepcion(calc) : percepcion;
+  calc.percep_iva = per?.importe > 0 ? r2(per.importe) : 0;
+  calc.percep_base = per?.base || 0; calc.percep_alic = per?.alic || 0;
+  calc.total = r2(calc.total + calc.percep_iva);
   validarReceptor(letra, calc.total, condReceptor, doc);
   const x = xmlImportes(calc, letra);
   const imp = { ...calc, ivaXml: x.iva, tribXml: x.trib };
@@ -271,7 +278,7 @@ async function emitir(t, { letra, total, alicuota, condReceptor = 5, cuitODni, f
   const asoc = asociado ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${asociado.cbte_tipo}</ar:Tipo><ar:PtoVta>${asociado.punto_venta}</ar:PtoVta><ar:Nro>${asociado.nro}</ar:Nro><ar:Cuit>${soloDigitos(f.cuit)}</ar:Cuit>${asociado.fecha ? `<ar:CbteFch>${yyyymmdd(asociado.fecha)}</ar:CbteFch>` : ''}</ar:CbteAsoc></ar:CbtesAsoc>` : '';
   const det = `<ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${pto}</ar:PtoVta><ar:CbteTipo>${cbteTipo}</ar:CbteTipo></ar:FeCabReq><ar:FeDetReq><ar:FECAEDetRequest>`
     + `<ar:Concepto>1</ar:Concepto><ar:DocTipo>${doc.docTipo}</ar:DocTipo><ar:DocNro>${doc.docNro}</ar:DocNro><ar:CbteDesde>${nro}</ar:CbteDesde><ar:CbteHasta>${nro}</ar:CbteHasta><ar:CbteFch>${fch}</ar:CbteFch>`
-    + `<ar:ImpTotal>${imp.total.toFixed(2)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${imp.neto.toFixed(2)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>${imp.imp_internos.toFixed(2)}</ar:ImpTrib><ar:ImpIVA>${imp.iva.toFixed(2)}</ar:ImpIVA>`
+    + `<ar:ImpTotal>${imp.total.toFixed(2)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${imp.neto.toFixed(2)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>${r2(imp.imp_internos + imp.percep_iva).toFixed(2)}</ar:ImpTrib><ar:ImpIVA>${imp.iva.toFixed(2)}</ar:ImpIVA>`
     + `<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>${Number(condReceptor)}</ar:CondicionIVAReceptorId>${asoc}${imp.tribXml}${imp.ivaXml}`
     + `</ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq>`;
   const { resp, errores } = await wsfe(t, 'FECAESolicitar', det);
@@ -282,10 +289,53 @@ async function emitir(t, { letra, total, alicuota, condReceptor = 5, cuitODni, f
   const caeVto = tag(tag(resp, 'FECAEDetResponse') || '', 'CAEFchVto');
   return {
     tipo: letra, cbte_tipo: cbteTipo, punto_venta: pto, nro, numero: `${String(pto).padStart(5, '0')}-${String(nro).padStart(8, '0')}`,
-    fecha: `${fch.slice(0, 4)}-${fch.slice(4, 6)}-${fch.slice(6)}`, total: imp.total, neto: imp.neto, iva: imp.iva, alicuota: imp.alicuota, alicuotas: imp.alicuotas, imp_internos: imp.imp_internos,
+    fecha: `${fch.slice(0, 4)}-${fch.slice(4, 6)}-${fch.slice(6)}`, total: imp.total, neto: imp.neto, iva: imp.iva, alicuota: imp.alicuota, alicuotas: imp.alicuotas, imp_internos: imp.imp_internos, percep_iva: imp.percep_iva, ...(imp.percep_iva ? { percep_base: imp.percep_base, percep_alic: imp.percep_alic } : {}),
     doc_tipo: doc.docTipo, doc_nro: doc.docNro, cond_iva_receptor: Number(condReceptor), cae, cae_vto: caeVto ? `${caeVto.slice(0, 4)}-${caeVto.slice(4, 6)}-${caeVto.slice(6)}` : null,
     ambiente: arcaCfg(t).ambiente || 'homologacion', observaciones: obs, estado: 'emitida',
   };
+}
+
+// ───────────── Percepción de IVA (Tributo Id 6) ─────────────
+// Configuración en Configuración → Percepción y deuda (setting percepcion_iva).
+const COMESTIBLES = /aliment|bebida|almac[eé]n|navidad/i;
+function configPercepcion(t) {
+  const c = store.getSettings(t).percepcion_iva || {};
+  return { activa: !!c.activa, pct: Number(c.pct) || 0, pct_reducida: c.pct_reducida === '' || c.pct_reducida == null ? null : Number(c.pct_reducida), min_percepcion: Number(c.min_percepcion) || 0, min_venta: Number(c.min_venta) || 0,
+    solo_ri: c.solo_ri !== false, desde: c.desde || '', min_sobre: c.min_sobre === 'total' ? 'total' : 'neto', sin_ml: !!c.sin_ml, solo_comestibles: !!c.solo_comestibles, sin_categoria: c.sin_categoria === 'no' ? 'no' : 'si' };
+}
+// Devuelve { importe, base, alic, auto } o null. forzar: true (tildada a mano) | false (destildada) | undefined (regla automática)
+function calcularPercepcion(t, { letra, condReceptor, plataforma, items, calc, fecha, forzar }) {
+  const c = configPercepcion(t);
+  if (!c.activa || forzar === false || !c.pct) return null;
+  if (String(letra) !== 'A') return null; // sólo facturas A
+  if (c.solo_ri && Number(condReceptor) !== 1) return null;
+  if (c.desde && String(fecha || new Date().toISOString()).slice(0, 10) < c.desde) return null;
+  if (c.sin_ml && /mercado ?libre/i.test(plataforma || '')) return null;
+  // proporción de cada alícuota que percibe (filtro de comestibles por categoría del producto)
+  let fraccion = 1;
+  if (c.solo_comestibles && items?.length) {
+    const prods = new Map(store.list(t, 'productos').map((p) => [String(p.sku), p]));
+    let tot = 0, si = 0;
+    for (const i of items) {
+      const v = (Number(i.cantidad) || 0) * Number(i.neto ?? i.precio ?? 0);
+      const cat = prods.get(String(i.sku))?.categoria || i.categoria || '';
+      tot += v;
+      if (cat ? COMESTIBLES.test(cat) : c.sin_categoria === 'si') si += v;
+    }
+    fraccion = tot > 0 ? si / tot : 0;
+  }
+  let importe = 0, base = 0;
+  for (const g of calc.alicuotas) {
+    const b = r2(g.neto * fraccion);
+    const pct = Number(g.alic) === 10.5 && c.pct_reducida != null ? c.pct_reducida : c.pct;
+    if (!(b > 0) || !pct) continue;
+    base = r2(base + b); importe = r2(importe + b * pct / 100);
+  }
+  if (!(importe > 0)) return null;
+  const auto = (c.min_sobre === 'total' ? calc.total : calc.neto) >= c.min_venta;
+  if (forzar !== true && !auto) return null;
+  if (importe < c.min_percepcion) return null;
+  return { importe, base, alic: base ? r2(importe / base * 100) : 0, auto };
 }
 
 // ───────────── Alto nivel: pedidos, manual, notas de crédito ─────────────
@@ -308,7 +358,9 @@ async function facturarPedidos(t, ids) {
     if (p.estado === 'cancelado') { out.push({ pedido: p.numero, ok: false, error: 'Pedido cancelado' }); continue; }
     const c = datosCliente(t, p);
     try {
-      const f = await emitir(t, { letra: letraPara(t, c.condReceptor), total: p.total, alicuota: Number(fiscal(t).alicuota_default) || 21, condReceptor: c.condReceptor, cuitODni: c.cuitODni });
+      const letra = letraPara(t, c.condReceptor);
+      const f = await emitir(t, { letra, total: p.total, alicuota: Number(fiscal(t).alicuota_default) || 21, condReceptor: c.condReceptor, cuitODni: c.cuitODni,
+        percepcion: (calc) => calcularPercepcion(t, { letra, condReceptor: c.condReceptor, plataforma: p.plataforma, items: p.items, calc }) });
       const reg = store.create(t, 'facturas', { ...f, pedido: p.numero, pedido_id: p.id, cliente: c.cliente, domicilio: c.domicilio, plataforma: p.plataforma, items: p.items || [] });
       out.push({ pedido: p.numero, ok: true, factura: reg.numero, tipo: reg.tipo, cae: reg.cae });
     } catch (e) {
@@ -344,7 +396,9 @@ async function facturaManual(t, b) {
     asociado = { cbte_tipo: CBTE[tipoAsoc], punto_venta: pv, nro, fecha: orig?.fecha || null };
     if (orig) b._asociado = orig;
   }
-  const f = await emitir(t, { letra, total: b._total, alicuota: Number(b.alicuota) || 21, lineas, condReceptor, cuitODni: b.cuit, asociado });
+  const forzar = b.percepcion === true || b.percepcion === 'si' ? true : b.percepcion === false || b.percepcion === 'no' ? false : undefined;
+  const f = await emitir(t, { letra, total: b._total, alicuota: Number(b.alicuota) || 21, lineas, condReceptor, cuitODni: b.cuit, asociado,
+    percepcion: (calc) => calcularPercepcion(t, { letra, condReceptor, plataforma: 'Venta directa', items, calc, forzar }) });
   const reg = store.create(t, 'facturas', { ...f, cliente: b.cliente || 'Consumidor final', domicilio: b.domicilio || '', items, manual: true, ...(b._asociado ? { asociada: b._asociado.numero, asociada_id: b._asociado.id } : {}) });
   if (b._asociado && letra.startsWith('NC')) registrarNC(t, b._asociado, reg);
   return reg;
@@ -366,20 +420,23 @@ async function notaCredito(t, facturaId, motivo, monto) {
   if (!(importe > 0) || importe > pendiente + 0.01) throw new Error(`El importe de la nota de crédito tiene que ser de hasta ${pendiente.toFixed(2)}`);
   const base = String(orig.tipo).replace(/^ND /, '');
   const factor = importe / Number(orig.total);
+  const percNC = orig.percep_iva ? r2(Number(orig.percep_iva) * factor) : 0;
   let lineas;
-  if (orig.alicuotas?.length || orig.imp_internos) {
+  if (orig.alicuotas?.length || orig.imp_internos || percNC) {
     lineas = (orig.alicuotas || []).map((g) => ({ cantidad: 1, precio: r2(g.neto * factor), alicuota: g.alic }));
     if (base === 'C') lineas = [{ cantidad: 1, precio: r2((Number(orig.neto) || Number(orig.total)) * factor), alicuota: 0 }];
     if (orig.imp_internos) { lineas[0] = lineas[0] || { cantidad: 1, precio: 0, alicuota: 0 }; lineas[0].imp_int = r2(orig.imp_internos * factor); }
     // el redondeo por alícuota puede correr un centavo: se ajusta en la primera línea
     for (let k = 0; k < 8 && lineas[0]; k++) {
-      const dif = r2(importe - calcularImportes(`NC ${base}`, lineas).total);
+      const dif = r2(importe - percNC - calcularImportes(`NC ${base}`, lineas).total);
       if (!dif) break;
       const paso = Math.abs(dif) >= 0.05 ? r2(dif / (1 + (base === 'C' ? 0 : lineas[0].alicuota / 100))) : Math.sign(dif) * 0.01;
       lineas[0].precio = r2(lineas[0].precio + paso);
     }
   }
-  const nc = await emitir(t, { letra: `NC ${base}`, total: importe, alicuota: orig.alicuota || 21, lineas, condReceptor: orig.cond_iva_receptor, cuitODni: orig.doc_nro !== '0' ? orig.doc_nro : '', asociado: orig });
+  if (percNC && !lineas) lineas = lineasDesdeTotal(r2(importe - percNC), orig.alicuota || 21, base);
+  const nc = await emitir(t, { letra: `NC ${base}`, total: importe, alicuota: orig.alicuota || 21, lineas, condReceptor: orig.cond_iva_receptor, cuitODni: orig.doc_nro !== '0' ? orig.doc_nro : '', asociado: orig,
+    percepcion: percNC ? { importe: percNC, base: r2(Number(orig.percep_base || 0) * factor), alic: Number(orig.percep_alic || 0) } : null });
   const reg = store.create(t, 'facturas', { ...nc, cliente: orig.cliente, domicilio: orig.domicilio, pedido: orig.pedido, pedido_id: orig.pedido_id, items: factor >= 0.9999 ? orig.items : [], asociada: orig.numero, asociada_id: orig.id, motivo: motivo || '', manual: !!orig.manual });
   registrarNC(t, orig, reg);
   return reg;
@@ -399,7 +456,7 @@ async function consultarComprobante(t, cbteTipo, ptoVta, nro) {
     cbte_tipo: Number(g('CbteTipo') || cbteTipo), punto_venta: Number(g('PtoVta') || ptoVta), nro: Number(g('CbteDesde') || nro),
     fecha: fch ? `${fch.slice(0, 4)}-${fch.slice(4, 6)}-${fch.slice(6, 8)}` : null, doc_tipo: Number(g('DocTipo')), doc_nro: g('DocNro'),
     total: Number(g('ImpTotal')), neto: Number(g('ImpNeto')), iva: Number(g('ImpIVA')), exento: Number(g('ImpOpEx') || 0), no_gravado: Number(g('ImpTotConc') || 0),
-    imp_internos: tribs.filter((x) => x.id === 4).reduce((a, x) => a + x.importe, 0), otros_tributos: tribs.filter((x) => x.id !== 4).reduce((a, x) => a + x.importe, 0),
+    imp_internos: tribs.filter((x) => x.id === 4).reduce((a, x) => a + x.importe, 0), percep_iva: tribs.filter((x) => x.id === 6).reduce((a, x) => a + x.importe, 0), otros_tributos: tribs.filter((x) => ![4, 6].includes(x.id)).reduce((a, x) => a + x.importe, 0),
     alicuotas, cae: g('CodAutorizacion'), cae_vto: g('FchVto'), resultado: g('Resultado'), cond_iva_receptor: Number(g('CondicionIVAReceptorId') || 0) || null,
   };
 }
@@ -459,4 +516,5 @@ function estado(t) {
   return { ambiente: a.ambiente || 'homologacion', tiene_clave: !!a.tiene_clave, tiene_cert: !!a.tiene_cert, cert_vence: a.cert_vence || null, cert_cn: a.cert_cn || null, cuit: f.cuit || '', razon_social: f.razon_social || '', punto_venta: f.punto_venta || '', condicion_iva: f.condicion_iva || '', emisor: condicionEmisor(t), csr: a.tiene_clave && !a.tiene_cert ? secretos(t).csr : null };
 }
 
-module.exports = { cuitValido, generarCSR, guardarCertificado, probar, estado, facturarPedidos, facturaManual, notaCredito, letraPara, condicionEmisor, COND_IVA, COND_IVA_NOMBRE, LETRA_DE_CODIGO, CBTE, ALICUOTAS, armarComprobante, documentoDe, calcularImportes, consultarComprobante, recuperarComprobante, faltantes };
+module.exports = {
+  calcularPercepcion, configPercepcion, cuitValido, generarCSR, guardarCertificado, probar, estado, facturarPedidos, facturaManual, notaCredito, letraPara, condicionEmisor, COND_IVA, COND_IVA_NOMBRE, LETRA_DE_CODIGO, CBTE, ALICUOTAS, armarComprobante, documentoDe, calcularImportes, consultarComprobante, recuperarComprobante, faltantes };

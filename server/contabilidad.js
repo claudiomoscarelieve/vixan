@@ -64,7 +64,7 @@ const PLAN_MODELO = [
 ];
 // Conceptos de los asientos automáticos y la cuenta que usan por defecto
 const CONCEPTOS = [
-  ['Ventas', 'deudores', 'Total facturado (a cobrar)', '1.1.2.01.001'], ['Ventas', 'ventas', 'Ventas (neto)', '4.1.1.01.001'], ['Ventas', 'iva_debito', 'IVA débito fiscal', '2.1.1.02.001'], ['Ventas', 'imp_internos', 'Impuestos internos facturados', '2.1.1.02.006'],
+  ['Ventas', 'deudores', 'Total facturado (a cobrar)', '1.1.2.01.001'], ['Ventas', 'ventas', 'Ventas (neto)', '4.1.1.01.001'], ['Ventas', 'iva_debito', 'IVA débito fiscal', '2.1.1.02.001'], ['Ventas', 'imp_internos', 'Impuestos internos facturados', '2.1.1.02.006'], ['Ventas', 'percep_iva_ventas', 'Percepciones de IVA practicadas (a depositar)', '2.1.1.02.005'],
   ['Compras', 'proveedores', 'Total de la factura (a pagar)', '2.1.1.01.001'], ['Compras', 'mercaderias', 'Compra de mercadería (órdenes)', '1.1.3.01.001'], ['Compras', 'iva_credito', 'IVA crédito fiscal', '1.1.2.02.001'],
   ['Compras', 'percep_iva', 'Percepciones de IVA sufridas', '1.1.2.02.003'], ['Compras', 'percep_iibb', 'Percepciones de IIBB sufridas', '1.1.2.02.005'], ['Compras', 'gastos_arca', 'Gastos y compras que sólo están en ARCA', '4.2.3.01.006'],
   ['Caja y bancos', 'caja', 'Caja (efectivo)', '1.1.1.01.001'], ['Caja y bancos', 'banco', 'Banco (transferencias)', '1.1.1.02.050'], ['Caja y bancos', 'mercado_pago', 'Mercado Pago', '1.1.1.02.003'],
@@ -207,7 +207,7 @@ function ventasLibro(t, { desde, hasta } = {}) {
     filas.push({
       fecha: dia(f.fecha), cbte_tipo: cod, comprobante: `${CBTE_NOMBRE[cod] || f.tipo} ${String(pv).padStart(5, '0')}-${String(nro).padStart(8, '0')}`, punto_venta: pv, nro,
       doc_tipo: Number(f.doc_tipo) || 99, doc_nro: f.doc_nro || '', nombre: f.cliente || '', cond_iva: f.cond_iva_receptor || null,
-      alicuotas: alic, no_gravado: letra === 'C' ? r2(total - n0(f.imp_internos)) : 0, exento: 0, imp_internos: n0(f.imp_internos), percep_iva: 0, otros_tributos: 0, total,
+      alicuotas: alic, no_gravado: letra === 'C' ? r2(total - n0(f.imp_internos) - n0(f.percep_iva)) : 0, exento: 0, imp_internos: n0(f.imp_internos), percep_iva: n0(f.percep_iva), otros_tributos: 0, total,
       cae: f.cae || '', origen: f.ambiente === 'homologacion' ? 'Vixan (prueba)' : 'Vixan', prueba: f.ambiente === 'homologacion', factura_id: f.id, pedido: f.pedido || '',
     });
   }
