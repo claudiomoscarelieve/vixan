@@ -4,6 +4,9 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## 1.10.1 — 27/11/2026
+- Emails: si no se cargó "Nombre del remitente" en Correo para avisos, se usa el nombre de la tienda (antes el correo mostraba solo la parte del email antes de la @).
+
 ## 1.10.0 + Vixan Tienda 0.6.0 — 27/11/2026
 **Compra online en la tienda (carrito, checkout y Mercado Pago)**:
 - **Finalizar compra** para clientes con cuenta: entrega (retiro en depósito o envío a coordinar con dirección), forma de pago (Mercado Pago, transferencia o a coordinar), notas y resumen. Precios, descuento por volumen, IVA y stock se calculan en Vixan con la lista del cliente; si algo cambió (sin stock, sin precio, múltiplo) se muestra y "Ajustar mi pedido" lo corrige.

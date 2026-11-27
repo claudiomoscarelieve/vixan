@@ -108,7 +108,9 @@ async function enviar(t, { para, asunto, texto, html, responderA }) {
   const de = direccion(c.remitente || c.usuario);
   const destino = direccion(para);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destino)) throw new Error('Email de destino inválido');
-  await smtp(c, de, destino, armarMensaje({ de, nombre: c.nombre || '', para: destino, responderA: direccion(responderA), asunto, texto, html }));
+  // Sin "Nombre del remitente", se usa el nombre de la tienda (si no, el cliente de correo muestra solo la parte antes de la @)
+  const nombre = c.nombre || (store.getSettings(t).tienda || {}).nombre || store.db.prepare('SELECT nombre FROM tenants WHERE id=?').get(t)?.nombre || '';
+  await smtp(c, de, destino, armarMensaje({ de, nombre, para: destino, responderA: direccion(responderA), asunto, texto, html }));
   return true;
 }
 
