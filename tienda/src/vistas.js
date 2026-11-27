@@ -21,6 +21,9 @@ function cssTema(t = {}) {
     .replace(/[<>]/g, '');
 }
 
+// ID público de la tienda en Vixan: config.json → vixan.tienda, o la variable VIXAN_TIENDA_ID
+const idTienda = (cfg) => cfg.vixan?.tienda || process.env.VIXAN_TIENDA_ID || '';
+
 function etiquetaIva(cfg) { return cfg.tienda.precioConIva ? 'IVA incluido' : '+ IVA'; }
 
 // ---------- Componentes ----------
@@ -63,7 +66,7 @@ function layout(cfg, fuente, { titulo, descripcion, cuerpo, actual = '', cabeza 
     whatsapp: wa || '', mensajeWhatsapp: cfg.contacto?.mensajeWhatsapp || '', nombre: t.nombre,
     precioConIva: !!t.precioConIva, compraMinimaInicial: t.compraMinimaInicial || 0, descuentoPorVolumen: t.descuentoPorVolumen || null,
     // Cuentas de compradores: la tienda habla con Vixan desde el navegador (ID público, no es secreto)
-    cuentas: cfg.vixan?.url && cfg.vixan?.tienda ? `${String(cfg.vixan.url).replace(/\/$/, '')}/api/v1/tienda/publico/${encodeURIComponent(cfg.vixan.tienda)}` : '',
+    cuentas: cfg.vixan?.url && idTienda(cfg) ? `${String(cfg.vixan.url).replace(/\/$/, '')}/api/v1/tienda/publico/${encodeURIComponent(idTienda(cfg))}` : '',
   };
   return `<!doctype html><html lang="es-AR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulo ? `${titulo} · ${t.nombre}` : t.nombre)}</title>
@@ -293,7 +296,7 @@ function mayoristas(cfg, fuente) {
 
 function cuenta(cfg, fuente) {
   const wa = cfg.contacto?.whatsapp;
-  const conectada = cfg.vixan?.url && cfg.vixan?.tienda;
+  const conectada = cfg.vixan?.url && idTienda(cfg);
   const provincias = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'];
   const campo = (nombre, etiqueta, attrs = '', ancho = '') => `<label class="${ancho}">${etiqueta}<input name="${nombre}" ${attrs}></label>`;
   return layout(cfg, fuente, {
