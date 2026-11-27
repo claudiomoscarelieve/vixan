@@ -53,6 +53,8 @@ for (const [ruta, [titulo, filtros, actual]] of Object.entries(listas)) {
 
 app.get('/mayoristas', (_req, res) => html(res, v.mayoristas(cfg, fuente)));
 app.get('/cuenta', (_req, res) => html(res, v.cuenta(cfg, fuente)));
+app.get('/cuenta/pedido', (_req, res) => html(res, v.pedidoCliente(cfg, fuente)));
+app.get('/checkout', (_req, res) => html(res, v.checkout(cfg, fuente)));
 
 app.get('/ph/:texto.svg', (req, res) => {
   res.set('Cache-Control', 'public, max-age=86400').type('image/svg+xml').send(v.placeholder(String(req.params.texto).slice(0, 60)));

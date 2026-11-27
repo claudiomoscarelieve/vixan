@@ -43,6 +43,8 @@ async function exportar(destino = path.join(__dirname, 'dist'), cfg = cargarConf
   pagina('/buscar', v.listado(cfg, fuente, { titulo: 'Buscar', items: [['Buscar']], filtros: { orden: '' }, buscarEnNavegador: true }));
   pagina('/mayoristas', v.mayoristas(cfg, fuente));
   pagina('/cuenta', v.cuenta(cfg, fuente));
+  pagina('/cuenta/pedido', v.pedidoCliente(cfg, fuente));
+  pagina('/checkout', v.checkout(cfg, fuente));
   archivos.set('404.html', v.noEncontrado(cfg, fuente));
 
   // Índice de búsqueda: texto para buscar + la tarjeta ya armada (misma plantilla que el resto)
@@ -86,7 +88,7 @@ Options -Indexes
 `);
   archivos.set('robots.txt', `User-agent: *\nAllow: /\n${base ? `Sitemap: ${base}/sitemap.xml\n` : ''}`);
   if (base) {
-    const urls = [...archivos.keys()].filter((r) => r.endsWith('index.html') && !r.startsWith('buscar/') && !r.startsWith('cuenta/'))
+    const urls = [...archivos.keys()].filter((r) => r.endsWith('index.html') && !r.startsWith('buscar/') && !r.startsWith('cuenta/') && !r.startsWith('checkout/'))
       .map((r) => `${base}/${r.replace(/index\.html$/, '')}`);
     archivos.set('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${u}</loc></url>`).join('\n')}\n</urlset>\n`);
   }

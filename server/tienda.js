@@ -53,8 +53,12 @@ function catalogoParaTienda(t) {
       actualizado: p._updated,
     });
   }
+  // Condiciones de compra configuradas en Vixan (Mi tienda → Cobros y envíos): la tienda las muestra igual que el checkout las calcula
+  const definidas = ['minimo_inicial', 'descuento_pct', 'descuento_desde', 'precio_con_iva'].some((k) => cfg[k] !== undefined && cfg[k] !== '');
+  let condiciones = null;
+  if (definidas) { const c = require('./checkout').config(t); condiciones = { compraMinimaInicial: c.minimo, descuentoPorVolumen: c.descuento, precioConIva: c.conIva, ivaPct: c.ivaPct }; }
   return {
-    tienda: { nombre: cfg.nombre || '', lista: lista.nombre },
+    tienda: { nombre: cfg.nombre || '', lista: lista.nombre, condiciones },
     generado: new Date().toISOString(),
     productos,
   };

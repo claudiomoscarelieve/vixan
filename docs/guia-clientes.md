@@ -128,6 +128,23 @@ Los comercios se registran en la tienda (**Ingresar → Crear cuenta**) con su r
 - **Rechazar** o **Bloquear** cierra el acceso. **🔑** genera una contraseña nueva: se muestra una vez y, si configuraste el correo, se le envía al comprador.
 - Si el comprador olvida la contraseña, la recupera solo desde la tienda (**¿Olvidaste tu contraseña?**): recibe un enlace que vence en 1 hora.
 
+### Compras y cobros en la tienda
+
+Los clientes con cuenta aprobada confirman el pedido en la tienda (**Mi pedido → Finalizar compra**): eligen retiro o envío, la forma de pago y pueden dejar una nota. Los precios y el stock se calculan en Vixan en ese momento, con la lista del cliente.
+
+- El pedido entra a **Vixan Market → Pedidos** con número **VT-…**, en estado **pendiente**, y **reserva el stock**. Te llega un email con el detalle y al cliente otro con la confirmación (y los datos para transferir, si eligió transferencia).
+- **Mercado Pago**: el cliente paga en Mercado Pago y vuelve a la tienda. Cuando el pago se aprueba, el pedido se marca **Pagado** y pasa a **Para armar** solo. Si no paga en el plazo que configures (48 h por defecto), el pedido se cancela y el stock se libera. Desde el detalle del pedido puede volver a intentar el pago.
+- **Transferencia** y **a coordinar**: marcás el pago a mano en el pedido cuando lo recibís.
+- El cliente ve sus pedidos, el estado y el pago en **Mi cuenta → Mis pedidos**.
+- Los renglones del pedido llevan el precio final (con descuento e IVA), así se facturan igual que los demás pedidos.
+
+En **Mi tienda → Cobros y envíos** configurás:
+- **Formas de pago**: Mercado Pago (con el Access Token de producción, que se comprueba al guardar), transferencia (con tus datos bancarios) y pago a coordinar.
+- **Envío**: retiro en el depósito (dirección y horario) y envío a coordinar (el costo se arregla después).
+- **Condiciones de compra**: compra mínima inicial (se avisa, no se exige), descuento por volumen, si las listas incluyen IVA y qué IVA se suma. Se publican con el catálogo, así la tienda muestra lo mismo que cobra el checkout.
+
+**Cómo conseguir el Access Token de Mercado Pago**: entrá a mercadopago.com.ar/developers con tu cuenta → **Tus integraciones → Crear aplicación** (tipo "Pagos online", producto "Checkout Pro") → **Credenciales de producción** → copiá el **Access Token** (empieza con `APP_USR-`) y pegalo en Cobros y envíos.
+
 ### Correo para avisos
 
 En **Mi tienda → Correo para avisos** cargá una casilla de tu dominio (en DonWeb: panel del hosting → Correo). Normalmente: servidor `mail.tudominio.com.ar`, seguridad **SSL (puerto 465)**, usuario y contraseña de la casilla. Con **Enviar email de prueba** comprobás que funcione. Vixan lo usa para avisarte de cuentas nuevas, confirmarle al comprador que su cuenta está aprobada y enviar los enlaces para recuperar contraseñas.

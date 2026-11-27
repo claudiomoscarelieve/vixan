@@ -364,4 +364,4 @@ correoRouter.post('/probar', soloAdmin, wrap(async (req) => {
   return { para };
 }));
 
-module.exports = { publico, panel, correoRouter, idPublico, preciosDeCuenta, cuitValido };
+module.exports = { publico, panel, correoRouter, idPublico, preciosDeCuenta, cuitValido, cuentaDeToken, urlTienda, tenantDeId };

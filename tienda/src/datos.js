@@ -108,11 +108,20 @@ function desdeVixan(data) {
 }
 
 // ---------- Fuente ----------
+// Las condiciones de compra configuradas en Vixan (mínimo, descuento, IVA) mandan sobre config.json,
+// así la tienda muestra lo mismo que después calcula el checkout.
+function aplicarCondiciones(config, data) {
+  const c = data?.tienda?.condiciones;
+  if (!c) return;
+  config.tienda = { ...config.tienda, compraMinimaInicial: c.compraMinimaInicial || 0, descuentoPorVolumen: c.descuentoPorVolumen || null, precioConIva: !!c.precioConIva, ivaPct: c.ivaPct || 21 };
+}
+
 async function crearFuente(config) {
-  let cache = config.fuente === 'vixan' ? desdeVixan(await leerDeVixan(config)) : generarDemo();
+  const cargar = async () => { const data = await leerDeVixan(config); aplicarCondiciones(config, data); return desdeVixan(data); };
+  let cache = config.fuente === 'vixan' ? await cargar() : generarDemo();
   return {
     origen: config.fuente === 'vixan' ? 'vixan' : 'demo',
-    async recargar() { if (config.fuente === 'vixan') cache = desdeVixan(await leerDeVixan(config)); },
+    async recargar() { if (config.fuente === 'vixan') cache = await cargar(); },
     categorias: () => cache.categorias,
     categoria: (s) => cache.categorias.find((c) => c.slug === s) || null,
     producto: (s) => cache.productos.find((p) => p.slug === s) || null,

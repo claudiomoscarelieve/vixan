@@ -598,6 +598,7 @@ async function tiendaConfig(el) {
     } catch (e) { VG.toast(e.message, true); }
   };
   el.querySelector('[data-revocar]')?.addEventListener('click', async () => { if (!VG.confirm('La tienda deja de recibir el catálogo. ¿Desconectar?')) return; await VG.del('/api/tienda/clave'); VG.toast('Tienda desconectada'); tiendaConfig(el); });
+  const cajaCobros = VG.h('<div class="card" style="margin-top:14px"></div>'); el.appendChild(cajaCobros); cobrosConfig(cajaCobros);
   const cajaCorreo = VG.h('<div class="card" style="margin-top:14px"></div>'); el.appendChild(cajaCorreo); correoConfig(cajaCorreo);
   el.querySelector('[data-ver]').onclick = async () => {
     const d = await VG.get('/api/tienda/vista-previa');
@@ -605,6 +606,52 @@ async function tiendaConfig(el) {
       ? `<table class="t"><thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock</th><th class="num">Fotos</th></tr></thead><tbody>${d.productos.map((p) => `<tr><td><code class="k">${esc(p.sku)}</code></td><td>${esc(p.nombre)}</td><td>${esc([p.categoria, p.subcategoria].filter(Boolean).join(' › ') || '—')}</td><td class="num">${money(p.precio)}</td><td class="num">${VG.n(p.stock)}</td><td class="num">${p.imagenes.length}</td></tr>`).join('')}</tbody></table>`
       : '<p>Todavía no hay productos para la tienda. En Catálogo, editá cada producto y marcá <b>Publicar en la tienda</b>; tiene que tener precio en la lista elegida.</p>' });
   };
+}
+
+// ═════════════ Cobros, envíos y condiciones de la tienda ═════════════
+async function cobrosConfig(el) {
+  const d = await VG.get('/api/tienda/cobros');
+  const t = d.tienda || {};
+  const def = (k, v) => (t[k] === undefined || t[k] === '' ? v : t[k]);
+  const valores = {
+    pago_mp: def('pago_mp', false), mp_token: d.mp_token, pago_transf: def('pago_transf', true), datos_transferencia: t.datos_transferencia || '',
+    pago_coordinar: def('pago_coordinar', false), texto_coordinar: t.texto_coordinar || '',
+    retiro: def('retiro', true), retiro_direccion: t.retiro_direccion || '', retiro_horario: t.retiro_horario || '', envio_coordinar: def('envio_coordinar', true),
+    minimo_inicial: t.minimo_inicial ?? '', descuento_desde: t.descuento_desde ?? '', descuento_pct: t.descuento_pct ?? '', precio_con_iva: def('precio_con_iva', false), iva_pct: def('iva_pct', 21), mp_cancelar_horas: def('mp_cancelar_horas', 48),
+  };
+  const fPagos = [
+    { k: 'pago_mp', label: 'Mercado Pago', type: 'checkbox', full: true },
+    { k: 'mp_token', label: 'Access Token de producción de Mercado Pago', type: 'password', full: true, placeholder: 'APP_USR-…' },
+    { k: 'mp_cancelar_horas', label: 'Cancelar pedidos de Mercado Pago sin pagar después de (horas, 0 = nunca)', type: 'number' },
+    { k: 'pago_transf', label: 'Transferencia bancaria', type: 'checkbox', full: true },
+    { k: 'datos_transferencia', label: 'Datos para transferir (se muestran al confirmar el pedido)', type: 'textarea', full: true, placeholder: 'Banco · Titular · CUIT · CBU · Alias' },
+    { k: 'pago_coordinar', label: 'Pago a coordinar (efectivo al retirar, cuenta corriente)', type: 'checkbox', full: true },
+    { k: 'texto_coordinar', label: 'Texto para el pago a coordinar', type: 'textarea', full: true },
+  ];
+  const fEnvios = [
+    { k: 'retiro', label: 'Retiro en el depósito', type: 'checkbox', full: true },
+    { k: 'retiro_direccion', label: 'Dirección de retiro' }, { k: 'retiro_horario', label: 'Horario de retiro', placeholder: 'Lunes a viernes de 9 a 17' },
+    { k: 'envio_coordinar', label: 'Envío a coordinar (el costo se arregla después)', type: 'checkbox', full: true },
+  ];
+  const fCond = [
+    { k: 'minimo_inicial', label: 'Compra mínima inicial (se avisa, no se exige)', type: 'number' },
+    { k: 'precio_con_iva', label: 'Los precios de las listas incluyen IVA', type: 'checkbox' },
+    { k: 'descuento_desde', label: 'Descuento por volumen desde ($)', type: 'number' }, { k: 'descuento_pct', label: 'Descuento por volumen (%)', type: 'number', step: '0.1' },
+    { k: 'iva_pct', label: 'IVA que se suma si los precios no lo incluyen (%)', type: 'number', step: '0.1' },
+  ];
+  el.innerHTML = `<h3>💳 Cobros y envíos de la tienda</h3>
+    <p class="muted small">Los clientes con cuenta confirman el pedido en la tienda; el pedido entra a Vixan Market → Pedidos como <b>pendiente</b> y reserva el stock. Con Mercado Pago se marca <b>Pagado</b> solo y pasa a <b>Para armar</b>; con transferencia o a coordinar marcás el pago a mano en el pedido.</p>
+    <div class="grid g3"><div data-p><h4>Formas de pago</h4></div><div data-e><h4>Envío</h4></div><div data-c><h4>Condiciones de compra</h4><p class="small muted">Mandan sobre las de la configuración de la tienda: se publican con el catálogo.</p></div></div>
+    <div class="small muted" style="margin-top:8px">${d.mp_cuenta ? `Mercado Pago conectado: <b>${esc(d.mp_cuenta)}</b>. ` : ''}Dirección de notificaciones de Mercado Pago (se configura sola en cada pago): <code class="k">${esc(d.notificaciones)}</code></div>`;
+  const fp = VG.form(fPagos, valores); const fe = VG.form(fEnvios, valores); const fc = VG.form(fCond, valores);
+  el.querySelector('[data-p]').appendChild(fp); el.querySelector('[data-e]').appendChild(fe); el.querySelector('[data-c]').appendChild(fc);
+  const b = VG.h(`<div class="toolbar" style="margin-top:12px"><button class="btn primary" data-g>Guardar cobros y envíos</button>${d.mp_token ? '<button class="btn" data-q>Desconectar Mercado Pago</button>' : ''}</div>`); el.appendChild(b);
+  b.querySelector('[data-g]').onclick = async (e) => {
+    const btn = e.target; btn.disabled = true;
+    try { await VG.put('/api/tienda/cobros', { ...VG.readForm(fp, fPagos), ...VG.readForm(fe, fEnvios), ...VG.readForm(fc, fCond) }); VG.toast('Cobros y envíos guardados'); cobrosConfig(el); }
+    catch (err) { VG.toast(err.message, true); btn.disabled = false; }
+  };
+  b.querySelector('[data-q]')?.addEventListener('click', async () => { if (!VG.confirm('La tienda deja de ofrecer Mercado Pago. ¿Desconectar?')) return; await VG.put('/api/tienda/cobros', { mp_quitar: true, pago_mp: false }); cobrosConfig(el); });
 }
 
 // ═════════════ Correo de la cuenta (SMTP) ═════════════

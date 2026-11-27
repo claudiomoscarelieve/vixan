@@ -46,7 +46,7 @@
     const d = T.descuentoPorVolumen;
     const desc = d && sub >= d.desde ? sub * d.porcentaje / 100 : 0;
     const neto = sub - desc;
-    const iva = T.precioConIva ? 0 : neto * 0.21;
+    const iva = T.precioConIva ? 0 : neto * (T.ivaPct || 21) / 100;
     return { sub, desc, iva, total: neto + iva };
   }
 
@@ -72,9 +72,10 @@
     pie.innerHTML = `${progreso}
       <div class="linea"><span>Subtotal (${unidades()} u.)</span><span>${pesos(t.sub)}</span></div>
       ${t.desc ? `<div class="linea desc"><span>Descuento ${d.porcentaje}%</span><span>−${pesos(t.desc)}</span></div>` : ''}
-      ${t.iva ? `<div class="linea"><span>IVA 21%</span><span>${pesos(t.iva)}</span></div>` : ''}
+      ${t.iva ? `<div class="linea"><span>IVA ${T.ivaPct || 21}%</span><span>${pesos(t.iva)}</span></div>` : ''}
       <div class="linea total"><span>Total</span><span>${pesos(t.total)}</span></div>
-      ${T.whatsapp ? '<button class="btn btn-agregar" type="button" data-enviar>Enviar pedido por WhatsApp</button>' : ''}
+      ${T.cuentas ? '<a class="btn btn-agregar" href="/checkout">Finalizar compra</a>' : ''}
+      ${T.whatsapp ? `<button class="btn ${T.cuentas ? 'btn-sec' : 'btn-agregar'}" type="button" data-enviar>${T.cuentas ? 'Consultar por WhatsApp' : 'Enviar pedido por WhatsApp'}</button>` : ''}
       <button class="btn btn-sec" type="button" data-vaciar>Vaciar pedido</button>`;
   }
 
@@ -265,7 +266,7 @@
   // ---------- Cuentas de compradores (login con Vixan) ----------
   // La sesión es un token guardado en este navegador. Con la sesión, la tienda pide a Vixan los precios
   // de la lista del cliente y los reemplaza en todas las páginas y en el pedido.
-  let cuenta = null; let preciosCliente = null; let listaCliente = '';
+  let cuenta = null; let preciosCliente = null; let listaCliente = ''; let sesionLista = Promise.resolve();
   const SESION = 'vt_sesion';
   const leerSesion = () => { try { return localStorage.getItem(SESION) || ''; } catch { return memoria.sesion || ''; } };
   const guardarSesion = (v) => { memoria.sesion = v; try { v ? localStorage.setItem(SESION, v) : localStorage.removeItem(SESION); sessionStorage.removeItem('vt_yo'); } catch { /* sin almacenamiento */ } };
@@ -338,6 +339,8 @@
     const ver = (v) => { vistas.forEach((s) => { s.hidden = s.dataset.vista !== v; }); window.scrollTo(0, 0); };
     const params = new URLSearchParams(location.search);
     const restablecer = params.get('restablecer');
+    // Después de ingresar, vuelve a la página desde la que vino (por ejemplo el checkout)
+    const volver = /^\/(?!\/)[\w\-/?=&.%]*$/.test(params.get('volver') || '') ? params.get('volver') : '';
     const rutear = () => {
       if (restablecer) return ver('restablecer');
       const h = location.hash.slice(1);
@@ -350,6 +353,9 @@
       $$('[data-dato]', app).forEach((x) => { x.textContent = x.dataset.dato === 'lista' ? listaCliente : (cuenta[x.dataset.dato] || ''); });
       if (x0) x0.textContent = (cuenta.nombre || '').split(' ')[0];
       ver('mi-cuenta');
+      api('/pedidos').then((ps) => {
+        $('[data-mis-pedidos]', app).innerHTML = ps.length ? `<div class="tabla-scroll"><table class="tabla-pedidos"><thead><tr><th>Pedido</th><th>Fecha</th><th class="num">Total</th><th>Estado</th><th>Pago</th></tr></thead><tbody>${ps.map((p) => `<tr><td><a href="/cuenta/pedido/?n=${encodeURIComponent(p.numero)}">${esc(p.numero)}</a></td><td>${new Date(p.fecha).toLocaleDateString('es-AR')}</td><td class="num">${pesos(p.total)}</td><td>${esc(p.estado_txt)}</td><td>${p.pago === 'Pagado' ? '<span class="chip ok">Pagado</span>' : p.estado === 'cancelado' ? '—' : `<span class="chip pend">Pendiente</span> <small>${esc(p.metodo_pago)}</small>`}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Todavía no hiciste pedidos desde la tienda.</p>';
+      }).catch(() => { $('[data-mis-pedidos]', app).innerHTML = '<p class="muted">No pudimos cargar tus pedidos.</p>'; });
     };
     const x0 = $('[data-dato="nombre"]', app);
 
@@ -367,7 +373,9 @@
     };
     enviarForm('ingresar', async (d) => {
       const r = await api('/ingreso', { email: d.email, password: d.password });
-      guardarSesion(r.token); aplicarSesion(r); mostrarCuenta();
+      guardarSesion(r.token); aplicarSesion(r);
+      if (volver) { location.href = volver; return; }
+      mostrarCuenta();
       aviso(`¡Hola, ${(r.cuenta.nombre || '').split(' ')[0]}! Ya ves tus precios.`);
     });
     enviarForm('registro', async (d) => {
@@ -395,9 +403,127 @@
       try { await api('/salir', {}); } catch { /* igual se cierra */ }
       guardarSesion(''); location.href = '/';
     });
-    cargarSesion().then(() => { if (cuenta && !restablecer) mostrarCuenta(); else rutear(); });
+    sesionLista = cargarSesion().then(() => { if (cuenta && volver) location.href = volver; else if (cuenta && !restablecer) mostrarCuenta(); else rutear(); });
   } else {
-    cargarSesion();
+    sesionLista = cargarSesion();
+  }
+
+
+  // ---------- Checkout ----------
+  const co = $('[data-checkout]');
+  if (co && T.cuentas) {
+    const estado = $('[data-co-estado]', co); const main = $('[data-co]', co);
+    let opciones = null; let cotizacion = null; let recotizando = null;
+    const items = () => pedido.map((i) => ({ id: i.id, cantidad: i.cant }));
+    const mostrarEstado = (html) => { estado.innerHTML = html; estado.hidden = false; main.hidden = true; };
+    const radio = (grupo, o, sel) => `<label class="co-opcion"><input type="radio" name="${grupo}" value="${esc(o.id)}"${sel ? ' checked' : ''}><span><b>${esc(o.nombre)}</b><small>${esc(o.detalle || '')}</small></span></label>`;
+
+    function pintarCotizacion() {
+      const q = cotizacion; if (!q) return;
+      $('[data-co-items]', co).innerHTML = q.lineas.map((l) => `<div class="co-item"><span class="co-cant">${l.cantidad}×</span><span class="co-nombre">${esc(l.nombre)}<small>${esc(l.sku)} · ${pesos(l.precio)} c/u</small></span><b>${pesos(l.importe)}</b></div>`).join('') || '<p class="muted">No hay productos disponibles en tu pedido.</p>';
+      $('[data-co-problemas]', co).innerHTML = q.problemas.length ? `<div class="co-problemas"><b>Hay cambios en tu pedido:</b>${q.problemas.map((p) => `<div>${esc(p.nombre)}: ${esc(p.motivo)}</div>`).join('')}<button class="btn btn-sec" type="button" data-co-ajustar>Ajustar mi pedido</button></div>` : '';
+      $('[data-co-totales]', co).innerHTML = `<div class="linea"><span>Subtotal</span><span>${pesos(q.subtotal)}</span></div>
+        ${q.descuento ? `<div class="linea desc"><span>Descuento ${q.descuentoPct}%</span><span>−${pesos(q.descuento)}</span></div>` : ''}
+        ${q.iva ? `<div class="linea"><span>IVA ${q.ivaPct}%</span><span>${pesos(q.iva)}</span></div>` : ''}
+        <div class="linea"><span>Envío</span><span>${$('[name=envio]:checked', co)?.value === 'coordinar' ? 'A coordinar' : 'Sin cargo'}</span></div>
+        <div class="linea total"><span>Total</span><span>${pesos(q.total)}</span></div>`;
+      const m = $('[data-co-minimo]', co); m.textContent = q.avisoMinimo || ''; m.hidden = !q.avisoMinimo;
+      const btn = $('[data-co-confirmar]', co); btn.disabled = !q.lineas.length || q.problemas.length > 0;
+      const pagoSel = $('[name=pago]:checked', co)?.value;
+      btn.textContent = pagoSel === 'mp' ? `Pagar ${pesos(q.total)} con Mercado Pago` : 'Confirmar pedido';
+    }
+    async function recotizar() {
+      if (!pedido.length) return mostrarEstado('<p>Tu pedido está vacío.</p><a class="btn" href="/catalogo">Ver el catálogo</a>');
+      try { cotizacion = await api('/cotizar', { items: items() }); main.hidden = false; estado.hidden = true; pintarCotizacion(); }
+      catch (e) { mostrarEstado(`<p class="form-error">${esc(e.message)}</p>`); }
+    }
+    // Si el comprador cambia el pedido desde el panel, se vuelve a calcular
+    const pintarOriginal = pintar;
+    pintar = function () { pintarOriginal(); if (opciones) { clearTimeout(recotizando); recotizando = setTimeout(recotizar, 400); } };
+
+    co.addEventListener('change', (e) => {
+      if (e.target.name === 'envio') $('[data-co-direccion]', co).hidden = e.target.value !== 'coordinar';
+      if (['envio', 'pago'].includes(e.target.name)) pintarCotizacion();
+    });
+    co.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-co-ajustar]')) return;
+      for (const p of cotizacion.problemas) {
+        const i = pedido.find((x) => x.id === p.id); if (!i) continue;
+        const mult = i.multiplo || 1; const q = Math.floor((p.disponible || 0) / mult) * mult;
+        if (q > 0) i.cant = q; else pedido = pedido.filter((x) => x !== i);
+      }
+      guardar('pedido', pedido); pintar(); recotizar();
+    });
+    $('[data-co-confirmar]', co).addEventListener('click', async (e) => {
+      const btn = e.target; const err = $('[data-co-error]', co); err.hidden = true;
+      const envio = $('[name=envio]:checked', co)?.value; const pago = $('[name=pago]:checked', co)?.value;
+      if (!envio || !pago) { err.textContent = 'Elegí cómo recibir el pedido y cómo pagarlo.'; err.hidden = false; return; }
+      const val = (n) => $(`[name=${n}]`, co)?.value || '';
+      const texto = btn.textContent; btn.disabled = true; btn.textContent = 'Confirmando…';
+      try {
+        const r = await api('/pedido', { items: items(), envio, pago, notas: val('notas'), direccion: val('direccion'), localidad: val('localidad'), provincia: val('provincia'), cp: val('cp') });
+        pedido = []; guardar('pedido', pedido);
+        if (r.url) { btn.textContent = 'Abriendo Mercado Pago…'; location.href = r.url; return; }
+        location.href = `/cuenta/pedido/?n=${encodeURIComponent(r.numero)}&nuevo=1${r.error ? '&mp=error' : ''}`;
+      } catch (ex) {
+        err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = texto;
+        if (ex.status === 409) recotizar();
+      }
+    });
+
+    sesionLista.then(async () => {
+      if (!cuenta) return mostrarEstado(`<div class="co-ingresar"><h2>Ingresá para finalizar tu compra</h2><p>La compra online es para clientes con cuenta aprobada. Tu pedido queda guardado.</p><a class="btn" href="/cuenta/?volver=/checkout/">Ingresar</a> <a class="btn btn-sec" href="/cuenta/?volver=/checkout/#registro">Crear cuenta</a></div>`);
+      try { opciones = await api('/checkout'); } catch (e) { return mostrarEstado(`<p class="form-error">${esc(e.message)}</p>`); }
+      if (!opciones.pagos.length || !opciones.envios.length) return mostrarEstado('<p>La compra online todavía no está activa. Podés enviar tu pedido por WhatsApp desde Mi pedido.</p>');
+      const c = opciones.cuenta;
+      $('[data-co-cliente]', co).innerHTML = `<b>${esc(c.razon_social)}</b><span>CUIT ${esc(c.cuit)} · ${esc(c.email)}</span>`;
+      $('[data-co-envios]', co).innerHTML = opciones.envios.map((o, i) => radio('envio', o, i === 0)).join('');
+      $('[data-co-pagos]', co).innerHTML = opciones.pagos.map((o, i) => radio('pago', o, i === 0)).join('');
+      for (const k of ['direccion', 'localidad', 'provincia', 'cp']) { const inp = $(`[name=${k}]`, co); if (inp && !inp.value) inp.value = c[k] || ''; }
+      $('[data-co-direccion]', co).hidden = opciones.envios[0]?.id !== 'coordinar';
+      await recotizar();
+    });
+  }
+
+  // ---------- Detalle de un pedido (también es la vuelta desde Mercado Pago) ----------
+  const pc = $('[data-pedido-cliente]');
+  if (pc && T.cuentas) {
+    const caja = $('[data-pc]', pc);
+    const q = new URLSearchParams(location.search);
+    const numero = q.get('n') || '';
+    const estadoMP = q.get('collection_status') || q.get('status') || '';
+    const pagoMP = q.get('payment_id') || q.get('collection_id') || '';
+    const pintarPedido2 = (p) => {
+      const msg = q.get('mp') === 'error' ? ['err', 'Tu pedido quedó registrado, pero no pudimos abrir Mercado Pago. Probá con el botón de abajo.']
+        : p.pago === 'Pagado' ? ['ok', q.get('nuevo') || estadoMP ? '¡Listo! Recibimos el pago de tu pedido.' : 'Pedido pagado.']
+        : estadoMP === 'approved' ? ['ok', 'Mercado Pago aprobó tu pago: en unos minutos se refleja en el pedido.']
+        : ['pending', 'in_process'].includes(estadoMP) ? ['pend', 'Tu pago está en proceso. Te avisamos por email cuando se acredite.']
+        : ['rejected', 'null', 'failure', 'cancelled'].includes(estadoMP) ? ['err', 'El pago no se completó. Podés intentar de nuevo.']
+        : q.get('nuevo') ? ['ok', '¡Gracias! Recibimos tu pedido.'] : null;
+      caja.innerHTML = `${msg ? `<div class="pc-aviso ${msg[0]}">${esc(msg[1])}</div>` : ''}
+        <h1>Pedido ${esc(p.numero)}</h1>
+        <p class="muted">${new Date(p.fecha).toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' })}</p>
+        <div class="cuenta-resumen"><div><span>Estado</span><b>${esc(p.estado_txt)}</b></div><div><span>Pago</span><b>${p.pago === 'Pagado' ? 'Pagado' : 'Pendiente'} · ${esc(p.metodo_pago)}</b></div><div><span>Entrega</span><b>${esc(p.tipo_envio)}</b></div></div>
+        ${p.instrucciones ? `<div class="pc-instrucciones"><b>${p.metodo_pago === 'Transferencia' && p.pago !== 'Pagado' ? 'Datos para transferir' : p.metodo_pago === 'A coordinar' && p.pago !== 'Pagado' ? 'Pago' : 'Retiro'}</b><div>${esc(p.instrucciones)}</div></div>` : ''}
+        ${p.puedePagar ? '<button class="btn btn-agregar" type="button" data-pagar>Pagar con Mercado Pago</button>' : ''}
+        <h2 class="sub">Productos</h2>
+        <div class="tabla-scroll"><table class="tabla-pedidos"><thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Importe</th></tr></thead><tbody>${p.items.map((i) => `<tr><td>${esc(i.nombre)}<br><small class="muted">${esc(i.sku)}</small></td><td class="num">${i.cantidad}</td><td class="num">${pesos(i.precio)}</td><td class="num">${pesos(i.importe)}</td></tr>`).join('')}</tbody></table></div>
+        <div class="pc-totales"><div class="linea"><span>Subtotal</span><span>${pesos(p.subtotal)}</span></div>${p.descuento ? `<div class="linea desc"><span>Descuento</span><span>−${pesos(p.descuento)}</span></div>` : ''}${p.iva ? `<div class="linea"><span>IVA</span><span>${pesos(p.iva)}</span></div>` : ''}<div class="linea total"><span>Total</span><span>${pesos(p.total)}</span></div></div>
+        ${p.direccion ? `<p><b>Envío a:</b> ${esc(p.direccion)}</p>` : ''}${p.notas ? `<p><b>Notas:</b> ${esc(p.notas)}</p>` : ''}
+        <p><a href="/cuenta">← Mis pedidos</a></p>`;
+      $('[data-pagar]', caja)?.addEventListener('click', async (e) => {
+        e.target.disabled = true; e.target.textContent = 'Abriendo Mercado Pago…';
+        try { const r = await api(`/pedidos/${encodeURIComponent(p.numero)}/pagar`, {}); location.href = r.url; }
+        catch (ex) { aviso(ex.message); e.target.disabled = false; e.target.textContent = 'Pagar con Mercado Pago'; }
+      });
+    };
+    sesionLista.then(async () => {
+      if (!cuenta) { caja.innerHTML = `<h1>Mi pedido</h1><p>Ingresá con tu cuenta para ver este pedido.</p><a class="btn" href="/cuenta/?volver=${encodeURIComponent(location.pathname + location.search)}">Ingresar</a>`; return; }
+      try {
+        const p = pagoMP ? await api(`/pedidos/${encodeURIComponent(numero)}/verificar`, { pago: pagoMP }) : await api(`/pedidos/${encodeURIComponent(numero)}`);
+        pintarPedido2(p);
+      } catch (e) { caja.innerHTML = `<h1>Mi pedido</h1><p class="form-error">${esc(e.message)}</p><p><a href="/cuenta">← Mi cuenta</a></p>`; }
+    });
   }
 
   pintar();

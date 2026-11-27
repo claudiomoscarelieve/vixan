@@ -72,7 +72,7 @@ function layout(cfg, fuente, { titulo, descripcion, cuerpo, actual = '', cabeza 
   const wa = cfg.contacto?.whatsapp;
   const publico = {
     whatsapp: wa || '', mensajeWhatsapp: cfg.contacto?.mensajeWhatsapp || '', nombre: t.nombre,
-    precioConIva: !!t.precioConIva, compraMinimaInicial: t.compraMinimaInicial || 0, descuentoPorVolumen: t.descuentoPorVolumen || null,
+    precioConIva: !!t.precioConIva, ivaPct: t.ivaPct || 21, compraMinimaInicial: t.compraMinimaInicial || 0, descuentoPorVolumen: t.descuentoPorVolumen || null,
     // Cuentas de compradores: la tienda habla con Vixan desde el navegador (ID público, no es secreto)
     cuentas: cfg.vixan?.url && idTienda(cfg) ? `${String(cfg.vixan.url).replace(/\/$/, '')}/api/v1/tienda/publico/${encodeURIComponent(idTienda(cfg))}` : '',
   };
@@ -384,7 +384,9 @@ function cuenta(cfg, fuente) {
       <div><span>Email</span><b data-dato="email"></b></div>
       <div><span>Tus precios</span><b data-dato="lista"></b></div>
     </div>
-    <p>Ya ves tus precios en toda la tienda. Armá tu pedido y envialo desde <a href="#" data-abrir="pedido">Mi pedido</a>.</p>
+    <p>Ya ves tus precios en toda la tienda. Armá tu pedido desde <a href="#" data-abrir="pedido">Mi pedido</a> y confirmalo en <a href="/checkout">Finalizar compra</a>.</p>
+    <h2 class="sub">Mis pedidos</h2>
+    <div data-mis-pedidos><p class="muted">Cargando…</p></div>
     <details class="cambiar-clave"><summary>Cambiar contraseña</summary>
       <form class="form-cuenta" data-form="clave">
         ${campo('actual', 'Contraseña actual', 'type="password" autocomplete="current-password" required')}
@@ -395,6 +397,48 @@ function cuenta(cfg, fuente) {
     <div class="toolbar-cuenta"><a class="btn" href="/catalogo">Ver el catálogo</a><button class="btn btn-sec" type="button" data-salir>Salir</button></div>
   </section>
 </div>`,
+  });
+}
+
+// ---------- Checkout (lo arma el navegador con los datos de Vixan: precios, stock y opciones) ----------
+function checkout(cfg, fuente) {
+  const conectada = cfg.vixan?.url && idTienda(cfg);
+  return layout(cfg, fuente, {
+    titulo: 'Finalizar compra',
+    cuerpo: `<div class="envoltura pagina checkout" data-checkout>${migas([['Finalizar compra']])}<h1>Finalizar compra</h1>
+  ${conectada ? '' : '<p class="nota">La compra online todavía no está activa en esta tienda. Podés enviar tu pedido por WhatsApp desde Mi pedido.</p>'}
+  <div data-co-estado class="co-estado"${conectada ? '' : ' hidden'}><p class="muted">Cargando tu pedido…</p></div>
+  <div class="co-grilla" data-co hidden>
+    <div class="co-pasos">
+      <section class="co-caja"><div class="co-titulo"><h2>1. Tu pedido</h2><a href="#" data-abrir="pedido">Editar</a></div><div data-co-items></div><div data-co-problemas></div></section>
+      <section class="co-caja"><h2>2. Entrega</h2><div class="co-opciones" data-co-envios></div>
+        <div class="form-grilla co-direccion" data-co-direccion hidden>
+          <label class="doble">Dirección de envío<input name="direccion" autocomplete="street-address"></label>
+          <label>Localidad<input name="localidad" autocomplete="address-level2"></label>
+          <label>Provincia<input name="provincia" autocomplete="address-level1"></label>
+          <label>Código postal<input name="cp" autocomplete="postal-code"></label>
+        </div></section>
+      <section class="co-caja"><h2>3. Pago</h2><div class="co-opciones" data-co-pagos></div></section>
+      <section class="co-caja"><h2>4. Notas (opcional)</h2><textarea name="notas" rows="3" maxlength="1000" placeholder="Horario de entrega, referencias, lo que necesites aclarar"></textarea></section>
+    </div>
+    <aside class="co-resumen co-caja">
+      <h2>Resumen</h2>
+      <div class="co-cliente" data-co-cliente></div>
+      <div data-co-totales></div>
+      <p class="aviso-minimo" data-co-minimo hidden></p>
+      <button class="btn btn-agregar co-confirmar" type="button" data-co-confirmar>Confirmar pedido</button>
+      <p class="form-error" data-co-error hidden></p>
+      <p class="small muted">Al confirmar, reservamos el stock de tu pedido.</p>
+    </aside>
+  </div>
+</div>`,
+  });
+}
+
+function pedidoCliente(cfg, fuente) {
+  return layout(cfg, fuente, {
+    titulo: 'Mi pedido',
+    cuerpo: `<div class="envoltura pagina angosta" data-pedido-cliente>${migas([['Mi cuenta', '/cuenta'], ['Pedido']])}<div data-pc><p class="muted">Cargando…</p></div></div>`,
   });
 }
 
@@ -410,4 +454,4 @@ function placeholder(texto) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="hsl(${tono} 30% 94%)"/><circle cx="200" cy="185" r="92" fill="hsl(${tono} 32% 86%)"/><rect x="128" y="292" width="144" height="14" rx="7" fill="hsl(${tono} 25% 84%)"/><text x="200" y="215" text-anchor="middle" font-family="system-ui,sans-serif" font-size="88" font-weight="600" fill="hsl(${tono} 28% 48%)">${inicial}</text></svg>`;
 }
 
-module.exports = { tarjeta, inicio, listado, categoria, producto, mayoristas, cuenta, noEncontrado, placeholder };
+module.exports = { checkout, pedidoCliente, tarjeta, inicio, listado, categoria, producto, mayoristas, cuenta, noEncontrado, placeholder };

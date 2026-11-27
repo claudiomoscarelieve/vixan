@@ -4,6 +4,16 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## 1.10.0 + Vixan Tienda 0.6.0 — 27/11/2026
+**Compra online en la tienda (carrito, checkout y Mercado Pago)**:
+- **Finalizar compra** para clientes con cuenta: entrega (retiro en depósito o envío a coordinar con dirección), forma de pago (Mercado Pago, transferencia o a coordinar), notas y resumen. Precios, descuento por volumen, IVA y stock se calculan en Vixan con la lista del cliente; si algo cambió (sin stock, sin precio, múltiplo) se muestra y "Ajustar mi pedido" lo corrige.
+- El pedido entra a Vixan Market → Pedidos como **VT-…**, pendiente, **reserva stock**, con CUIT y condición de IVA para facturar, y renglones a precio final.
+- **Mercado Pago (Checkout Pro)**: preferencia con vencimiento, vuelta a la tienda, notificaciones verificadas consultando el pago en Mercado Pago, pedido Pagado → Para armar automático, reintento de pago desde el detalle y cancelación automática de los impagos (48 h por defecto) que libera el stock.
+- **Mis pedidos** y detalle del pedido en Mi cuenta, con datos para transferir o de retiro.
+- Emails: pedido recibido (cliente y vendedor) y pago acreditado.
+- **Mi tienda → Cobros y envíos**: formas de pago, Access Token de Mercado Pago (se valida al guardar y no viaja en la configuración general), datos de transferencia, retiro y condiciones de compra (mínimo, descuento, IVA) que se publican con el catálogo.
+- Tienda: "Finalizar compra" en Mi pedido (WhatsApp queda como consulta), vuelta automática al checkout después de ingresar.
+
 ## Vixan Tienda 0.5.1 — 27/11/2026
 - Los estilos y el comportamiento de la tienda llevan su versión en la dirección: después de publicar, el navegador y Cloudflare toman los archivos nuevos sin tener que apretar Ctrl + F5.
 

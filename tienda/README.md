@@ -2,7 +2,7 @@
 
 Vidriera de e-commerce de cada cliente de Vixan. Se instala en el **servidor propio del cliente** y toma catálogo, precios y stock de Vixan (servidor central multicliente).
 
-> Versión 0.5.0: plantilla completa conectada al catálogo de Vixan, con cuentas de compradores (registro con aprobación y precio según la lista de cada cliente). El checkout con Mercado Pago llega en una próxima etapa.
+> Versión 0.6.0: plantilla completa conectada al catálogo de Vixan, con cuentas de compradores (registro con aprobación y precio según la lista de cada cliente) y compra online con Mercado Pago, transferencia o pago a coordinar.
 
 ## Probarla
 

@@ -12,6 +12,7 @@ const contabilidad = require('./contab-rutas');
 const arca = require('./arca');
 const tienda = require('./tienda');
 const cuentas = require('./cuentas');
+const checkout = require('./checkout');
 const { facturaHTML } = require('./factura-html');
 const STOCK_ENTITIES = new Set(['lotes', 'pedidos', 'productos']);
 // Avisa al sincronizador de WooCommerce cuando algo pudo cambiar el stock
@@ -106,7 +107,9 @@ app.post('/api/auth/logout', (req, res) => {
 app.use('/api/hooks', integrar.publicRouter);
 
 // Vixan Tienda: registro e ingreso de compradores (lo usa la tienda desde el navegador; sin sesión de Vixan)
-app.use('/api/v1/tienda/publico', cuentas.publico);
+app.use('/api/v1/tienda/publico', cuentas.publico, checkout.publico);
+// Notificaciones de pago de Mercado Pago para la tienda
+app.use('/api/v1/tienda/mp', checkout.webhook);
 
 app.use('/api', auth);
 
@@ -147,6 +150,7 @@ app.use('/api/catalogo', catalogo.router);
 // Vixan Tienda: catálogo para la tienda (clave de alcance "tienda") y panel de conexión
 app.use('/api/v1/tienda', (req, res, next) => (store.db.prepare('SELECT activo FROM tenants WHERE id=?').get(req.tenantId)?.activo ? next() : res.status(403).json({ ok: false, error: 'La cuenta está suspendida' })), tienda.publicRouter);
 app.use('/api/tienda/cuentas', cuentas.panel);
+app.use('/api/tienda/cobros', checkout.panel);
 app.use('/api/correo', cuentas.correoRouter);
 app.use('/api/tienda', tienda.router);
 
@@ -277,7 +281,7 @@ app.post('/api/proyecciones/crear-oc', wrap((req) => {
 
 // ───────────── Configuración, usuarios y API keys ─────────────
 // La configuración se devuelve SIN secretos (claves de APIs, certificados, tokens)
-const PRIVADAS = /^(arca_secret|arca_ta_|arca$|woo$|ml$|correo$)/; // correo: la contraseña SMTP solo se maneja en /api/correo
+const PRIVADAS = /^(arca_secret|arca_ta_|arca$|woo$|ml$|correo$|mercadopago$)/; // correo: la contraseña SMTP solo se maneja en /api/correo
 function settingsPublicas(t) {
   const s = store.getSettings(t);
   for (const k of Object.keys(s)) if (PRIVADAS.test(k)) delete s[k];
