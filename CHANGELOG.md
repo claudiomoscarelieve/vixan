@@ -4,6 +4,9 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## 1.7.1 — 27/11/2026
+- Vista previa del enlace (WhatsApp, redes, buscadores): título "Vixan — Plataforma integral para e-commerce", descripción e imagen del logo.
+
 ## 1.7.0 — 27/11/2026
 **Facturación** (Finanzas → Facturación):
 - Panel por período con seis tarjetas (sin facturar, facturado, facturable, notas de crédito, cancelados y emitido según ARCA), filtros y "Facturar seleccionadas / Facturar todo".
