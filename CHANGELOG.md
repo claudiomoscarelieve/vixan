@@ -4,6 +4,9 @@ Cada versión nueva va arriba. El número sigue el formato MAYOR.MENOR.ARREGLO:
 cambia el MENOR cuando se agregan funciones y el ARREGLO cuando solo se corrigen errores.
 La versión instalada se ve en **Panel Vixan → Servidor**.
 
+## Vixan Tienda 0.5.1 — 27/11/2026
+- Los estilos y el comportamiento de la tienda llevan su versión en la dirección: después de publicar, el navegador y Cloudflare toman los archivos nuevos sin tener que apretar Ctrl + F5.
+
 ## 1.9.0 + Vixan Tienda 0.5.0 — 27/11/2026
 **Cuentas de compradores en la tienda**:
 - **Registro con aprobación**: el comercio se registra en la tienda con razón social, CUIT (se valida el dígito verificador), condición de IVA, contacto y dirección. Queda pendiente y se vincula con el cliente existente (por CUIT o email) o crea uno nuevo con la etiqueta Tienda.

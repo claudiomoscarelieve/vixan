@@ -1,5 +1,13 @@
 // Plantilla de Vixan Tienda. Páginas generadas en el servidor (mejor para SEO) con template literals, sin dependencias.
 
+// Versión de los archivos de estilo y comportamiento: cambia cuando cambia su contenido,
+// así el navegador y Cloudflare no siguen usando una copia vieja después de publicar.
+const VERSION_RECURSOS = (() => {
+  const h = require('crypto').createHash('sha1');
+  for (const f of ['tienda.css', 'tienda.js']) { try { h.update(require('fs').readFileSync(require('path').join(__dirname, '..', 'public', f))); } catch { /* sin archivo */ } }
+  return h.digest('hex').slice(0, 10);
+})();
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pesos = (n) => '$' + Math.round(n).toLocaleString('es-AR');
 const img = (p) => p.imagenes?.[0] || `/ph/${encodeURIComponent(p.nombre)}.svg`;
@@ -72,7 +80,7 @@ function layout(cfg, fuente, { titulo, descripcion, cuerpo, actual = '', cabeza 
 <title>${esc(titulo ? `${titulo} · ${t.nombre}` : t.nombre)}</title>
 <meta name="description" content="${esc(descripcion || t.eslogan || '')}">
 ${t.favicon ? `<link rel="icon" href="${esc(t.favicon)}">` : ''}${t.iconoApple ? `<link rel="apple-touch-icon" href="${esc(t.iconoApple)}">` : ''}<meta name="theme-color" content="${esc(cfg.tema?.primario || '#0F253C')}">
-${cabeza}<style>${cssTema(cfg.tema)}</style><link rel="stylesheet" href="/tienda.css">
+${cabeza}<style>${cssTema(cfg.tema)}</style><link rel="stylesheet" href="/tienda.css?v=${VERSION_RECURSOS}">
 </head><body>
 <a class="saltar" href="#contenido">Ir al contenido</a>
 ${avisos ? `<div class="avisos"><div class="avisos-pista">${avisos}${avisos}</div></div>` : ''}
@@ -115,7 +123,7 @@ ${avisos ? `<div class="avisos"><div class="avisos-pista">${avisos}${avisos}</di
 <aside class="panel" id="panel-favoritos" aria-label="Mis favoritos"><header><h3>Mis favoritos</h3><button type="button" data-cerrar>${ICON.cerrar}</button></header><div class="panel-cuerpo" data-lista="favoritos"></div></aside>
 ${wa ? `<a class="wa-flotante" href="https://wa.me/${esc(wa)}?text=${encodeURIComponent(cfg.contacto.mensajeWhatsapp || '')}" target="_blank" rel="noopener">${ICON.whatsapp}<span>¿Te ayudamos?</span></a>` : ''}
 <div class="aviso-flotante" role="status" aria-live="polite"></div>
-<script>window.TIENDA=${JSON.stringify(publico).replace(/</g, '\\u003c')}</script><script src="/tienda.js"></script>
+<script>window.TIENDA=${JSON.stringify(publico).replace(/</g, '\\u003c')}</script><script src="/tienda.js?v=${VERSION_RECURSOS}"></script>
 </body></html>`;
 }
 
